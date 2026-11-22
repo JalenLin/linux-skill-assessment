@@ -116,7 +116,7 @@ You can also run it directly on the PVE host (root must be able to ssh to itself
 After deployment:
 
 - The application is at `/opt/lsa` in lsa-web; the service is named `lsa` (port 80)
-- Data is in `/var/lib/lsa/data` (`lsa.db`, terminal logs in `shell_logs/`)
+- Data is in `/var/lib/lsa/data` (`lsa.db`, terminal recordings in `shell_logs/a<account id>/*.cast`)
 - The question bank is in `/var/lib/lsa/questions` (**deployments never overwrite it**; the first install only adds the example questions)
 - View logs: `pct exec 100 -- journalctl -u lsa -f`
 

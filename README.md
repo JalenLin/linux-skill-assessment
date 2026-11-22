@@ -34,7 +34,7 @@
 - **題目包**：一題一個資料夾（YAML + Ansible playbook），後台上傳 zip、一鍵建置範本並**自我測試**
   （未作答應 0 分、套用標準解答應滿分）
 - **多國語言**：介面與題目都可多語言，作答者和管理者可自行切換
-- **作答紀錄**：每個人的終端機輸入與畫面輸出都有紀錄，評分之外也能看「怎麼解的」
+- **作答紀錄與重播**：每次終端機連線都錄成 asciicast，後台可以像影片一樣重播（點輸入列表跳到該時間），評分之外也能看「怎麼解的」
 
 ## 架構
 
@@ -133,4 +133,4 @@ config.dev.yaml   本機開發用（mock 模式）
 
 ## 授權
 
-[MIT](LICENSE)。內含的 [xterm.js](https://github.com/xtermjs/xterm.js) 為 MIT 授權（見 `app/static/vendor/LICENSE`）。
+[MIT](LICENSE)。內含的 [xterm.js](https://github.com/xtermjs/xterm.js)（MIT）與 [asciinema-player](https://github.com/asciinema/asciinema-player)（Apache-2.0），見 `app/static/vendor/LICENSE`。

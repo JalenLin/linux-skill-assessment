@@ -1,0 +1,39 @@
+{% extends "admin/base.html" %}
+{% block head %}<link rel="stylesheet" href="/static/vendor/asciinema-player.css">{% endblock %}
+{% block admin %}
+<p><a href="/admin/participant/{{ acc.id }}">← {{ acc.participant_code or acc.username }}</a></p>
+<div class="card">
+  <h2>{{ _("終端機重播") }} <span class="muted" style="font-size:14px;font-weight:normal">{{ info.set_name }} · {{ info.qid }} · {{ info.started }}</span></h2>
+  <p class="muted">{{ _("閒置超過 2 秒的片段會縮短。進度條上的標記是每一行輸入；點右邊的列表可以跳到該時間。") }}
+    <a href="/admin/shell_log/{{ acc.id }}/{{ name }}?view=input" target="_blank">{{ _("輸入文字") }}</a> ·
+    <a href="/admin/shell_log/{{ acc.id }}/{{ name }}?view=output" target="_blank">{{ _("畫面文字") }}</a> ·
+    <a href="/admin/shell_log/{{ acc.id }}/{{ name }}?view=cast">{{ _("下載 .cast") }}</a></p>
+  <div class="rec-wrap">
+    <div id="player" class="rec-player"></div>
+    <ol class="rec-lines" id="rec-lines">
+      {% for l in lines %}<li class="{{ l.kind }}" data-i="{{ loop.index0 }}"><span class="muted">{{ l.at }}</span> {% if l.kind == 'blocked' %}⚠ {{ _("貼上被擋") }}{{ _("：") }}{{ l.text[15:] }}{% else %}<code>{{ l.text }}</code>{% endif %}</li>
+      {% else %}<li class="muted">{{ _("沒有輸入") }}</li>{% endfor %}
+    </ol>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/vendor/asciinema-player.min.js"></script>
+<script>
+(function () {
+  var player = AsciinemaPlayer.create({{ ("/admin/shell_log/%d/%s?view=player" % (acc.id, name)) | tojson }},
+    document.getElementById("player"), {idleTimeLimit: 2, fit: "width", terminalFontSize: "14px", preload: true});
+  var items = document.querySelectorAll("#rec-lines li[data-i]");
+  items.forEach(function (li) {
+    li.addEventListener("click", function () {
+      player.seek({marker: parseInt(li.dataset.i, 10)}).then(function () { player.play(); });
+    });
+  });
+  player.addEventListener("marker", function (e) {
+    items.forEach(function (li) { li.classList.toggle("now", parseInt(li.dataset.i, 10) === e.index); });
+    var cur = document.querySelector("#rec-lines li.now");
+    if (cur) cur.scrollIntoView({block: "nearest"});
+  });
+})();
+</script>
+{% endblock %}

@@ -34,7 +34,7 @@ You write your own question packages (YAML + Ansible). One example question is i
 - **Attendance and semester summary** for practice sessions
 - **Pre-issued accounts** — generate and print accounts; users bind their ID on first login (or import a CSV with IDs)
 - **Question packages** with one-click template build and **self-test**: unsolved must score 0, the reference solution must score full marks
-- **Session recording** — every keystroke and all terminal output is kept for review
+- **Session recording and replay** — every terminal connection is recorded as asciicast and can be replayed in the admin UI like a video (click an input line to jump to it)
 - **Multilingual** UI and questions; users switch language themselves
 
 ## Architecture
@@ -110,4 +110,4 @@ the admin upload or `deploy/push-questions.sh`.
 
 ## License
 
-[MIT](LICENSE). Bundles [xterm.js](https://github.com/xtermjs/xterm.js) (MIT, see `app/static/vendor/LICENSE`).
+[MIT](LICENSE). Bundles [xterm.js](https://github.com/xtermjs/xterm.js) (MIT) and [asciinema-player](https://github.com/asciinema/asciinema-player) (Apache-2.0); see `app/static/vendor/LICENSE`.

@@ -116,3 +116,12 @@ body.term-only .lsa-term { height: 100vh; }
 /* 開始使用的步驟 */
 .steps { line-height: 2; padding-left: 22px; }
 .steps b { display: inline-block; width: 1.2em; }
+/* 終端機重播 */
+.rec-wrap { display: flex; gap: 16px; align-items: flex-start; }
+.rec-player { flex: 1 1 auto; min-width: 0; }
+.rec-lines { flex: 0 0 320px; max-height: 70vh; overflow-y: auto; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.rec-lines li { padding: 3px 6px; border-radius: 4px; cursor: pointer; white-space: pre-wrap; word-break: break-all; }
+.rec-lines li:hover { background: rgba(127, 127, 127, .12); }
+.rec-lines li.now { background: rgba(9, 105, 218, .15); }
+.rec-lines li.blocked { color: var(--bad); }
+@media (max-width: 900px) { .rec-wrap { flex-direction: column; } .rec-lines { flex-basis: auto; width: 100%; max-height: 40vh; } }

@@ -114,7 +114,7 @@ echo 'PVE=root@192.168.1.10' > deploy/deploy.env    # PVE 主機；這個檔案�
 部署後：
 
 - 程式在 lsa-web 的 `/opt/lsa`，服務名稱 `lsa`（port 80）
-- 資料在 `/var/lib/lsa/data`（`lsa.db`、終端機紀錄 `shell_logs/`）
+- 資料在 `/var/lib/lsa/data`（`lsa.db`、終端機紀錄 `shell_logs/a<帳號 id>/*.cast`）
 - 題庫在 `/var/lib/lsa/questions`（**部署不會覆蓋**，第一次安裝只放入範例題）
 - 看紀錄：`pct exec 100 -- journalctl -u lsa -f`
 

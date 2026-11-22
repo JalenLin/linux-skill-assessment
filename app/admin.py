@@ -14,14 +14,13 @@ from datetime import datetime
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 
-from . import attempts, build, db, grader, instances, questions, sets
+from . import attempts, build, db, grader, instances, questions, recording, sets
 from .config import cfg
 from .i18n import _
 from .security import hash_password, random_password
 
 log = logging.getLogger("admin")
 router = APIRouter(prefix="/admin")
-ANSI_RE = re.compile(rb"\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07]*\x07|\x1b[()][A-Z0-9]")
 _tasks: set[asyncio.Task] = set()
 job_status: dict[str, str] = {}   # 長時間批次工作的進度訊息
 
@@ -377,6 +376,7 @@ async def set_delete(request: Request, sid: int, confirm: str = Form("")):
     db.execute("DELETE FROM check_runs WHERE set_id=?", (sid,))
     db.execute("DELETE FROM set_questions WHERE set_id=?", (sid,))
     db.execute("DELETE FROM qsets WHERE id=?", (sid,))
+    recording.delete_set(sid)
     return _back("/admin/sets", _("題組「{name}」與其成績紀錄已刪除", name=st['name']))
 
 
@@ -649,6 +649,7 @@ async def account_action(request: Request, aid: int, action: str):
         db.execute("DELETE FROM attempts WHERE account_id=?", (aid,))
         db.execute("DELETE FROM activity WHERE account_id=?", (aid,))
         db.execute("DELETE FROM accounts WHERE id=?", (aid,))
+        recording.delete_account(aid)
         return _back("/admin/accounts", _("{u} 已刪除", u=acc['username']))
     return _back("/admin/accounts", _("未知操作"))
 
@@ -668,11 +669,7 @@ async def participant_detail(request: Request, aid: int):
     acts = db.query("SELECT * FROM activity WHERE account_id=? ORDER BY id DESC LIMIT 200", (aid,))
     for r in runs + insts + atts + acts:
         r["set_name"] = names.get(r["set_id"], f"#{r['set_id']}") if r["set_id"] else ""
-    logs = []
-    if acc["participant_code"]:
-        d = cfg.data_path / "shell_logs" / acc["participant_code"]
-        if d.is_dir():
-            logs = sorted(p.name for p in d.iterdir())
+    logs = recording.list_for(aid, names)
     return _render(request, "admin/participant.html", {"acc": acc, "runs": runs, "insts": insts, "logs": logs,
                                                     "atts": atts, "acts": acts})
 
@@ -710,19 +707,39 @@ async def run_log(request: Request, rid: int):
             f"\n\n{head}\n\n{r['log'] or ''}")
 
 
-@router.get("/shell_log/{aid}/{name}", response_class=PlainTextResponse)
-async def shell_log(request: Request, aid: int, name: str):
+@router.get("/recording/{aid}/{name}", response_class=HTMLResponse)
+async def recording_page(request: Request, aid: int, name: str):
+    """終端機重播：asciinema-player＋輸入列表（點一下跳到該時間）"""
     require_admin(request)
     acc = db.one("SELECT * FROM accounts WHERE id=?", (aid,))
-    if acc is None or not acc["participant_code"] or "/" in name or name.startswith("."):
+    p = recording.safe_path(aid, name) if acc else None
+    if p is None:
+        return _back(f"/admin/participant/{aid}" if acc else "/admin", _("紀錄不存在"))
+    header, events = recording.read(p)
+    lines = recording.input_lines(header, events)
+    info = next((r for r in recording.list_for(aid, {x["id"]: x["name"] for x in sets.all_sets()}) if r["name"] == name), {})
+    return _render(request, "admin/recording.html", {"acc": acc, "name": name, "lines": lines, "info": info})
+
+
+@router.get("/shell_log/{aid}/{name}")
+async def shell_log(request: Request, aid: int, name: str, view: str = "cast"):
+    """view=cast 原始 asciicast（下載）；player 播放器用（含每行輸入的標記）；input 輸入文字；output 畫面文字"""
+    require_admin(request)
+    p = recording.safe_path(aid, name)
+    if p is None:
         return PlainTextResponse("not found", 404)
-    p = cfg.data_path / "shell_logs" / acc["participant_code"] / name
-    if not p.is_file():
-        return PlainTextResponse("not found", 404)
-    raw = p.read_bytes()
-    if request.query_params.get("raw") != "1":
-        raw = ANSI_RE.sub(b"", raw).replace(b"\r\n", b"\n").replace(b"\r", b"")
-    return raw.decode("utf-8", "replace")
+    if view == "cast":
+        return Response(p.read_bytes(), media_type="application/x-asciicast",
+                        headers={"Content-Disposition": f'attachment; filename="{name}"'})
+    header, events = recording.read(p)
+    if view == "player":
+        return Response(recording.player_cast(header, events, recording.input_lines(header, events)),
+                        media_type="application/x-asciicast")
+    if view == "input":
+        return PlainTextResponse("\n".join(f"[{r['at']}] {r['text']}" for r in recording.input_lines(header, events)))
+    if view == "output":
+        return PlainTextResponse(recording.output_text(events))
+    return PlainTextResponse("unknown view", 400)
 
 
 # ---------------- 實例管理 ----------------

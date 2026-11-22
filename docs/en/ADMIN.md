@@ -137,7 +137,11 @@ The attendance column in the Score overview shows the number of IPs; one person 
   - Instances: environments and status for each question in each question set
   - Timed attempts: "End now" (and reset the environment), "Reset attempts"
   - Check history: the time, score, and message of each check; click in to see each check item and the Ansible output
-  - Terminal logs: the participant's input and screen output (blocked pastes are logged too)
+  - Terminal logs: one entry per terminal connection, listing start time, question set, question, length, number of inputs and blocked pastes
+    - **Replay**: plays back like a video with asciinema-player (pause, speed, seek); idle periods longer than 2 seconds are shortened
+    - On the right is the **input list** (each command line, keys such as arrows and ⌫, with times); click one to jump to it. Blocked pastes are shown in red
+    - "Input text" and "Screen text" show plain text (easy to search and copy); ".cast" downloads the original file, which `asciinema play` can play locally
+    - Recordings are deleted together with the account or question set
   - Activity log: logins, entering question sets, opening questions, connecting to terminals (the basis for attendance)
 
 ## Instance (participant environment) management
@@ -187,7 +191,7 @@ The same workflow can also be used to give job candidates hands-on troubleshooti
    - Enable "Block pasting in the terminal" if needed
 3. **On the interview day**: give the candidate the username and password (online interviews work too, as long as they can reach the site)
 4. **Review afterwards**: the "participant page" in the admin panel shows
-   - **Terminal logs**: every command the candidate typed and the screen output (to see their reasoning and whether they were trying things at random)
+   - **Terminal logs**: replay the candidate's whole session and jump to key commands from the input list (to see their reasoning and whether they were trying things at random)
    - **Check history**: the time of each check and the result of each item
    - Activity log: times and IPs of opening questions and connecting
 5. Afterwards, delete the question set's instances; accounts can be deleted or kept for the record

@@ -4,43 +4,23 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import time
 
 import asyncssh
 from fastapi import WebSocket, WebSocketDisconnect
 
 from . import instances
+from .recording import Recorder
 from .config import cfg
 from .i18n import _
 
 log = logging.getLogger("shell")
 
 
-class _Recorder:
-    """把終端機輸出記錄下來（事後檢視 / 抓抄襲用）"""
-
-    def __init__(self, participant_code: str, name: str) -> None:
-        d = cfg.data_path / "shell_logs" / participant_code
-        d.mkdir(parents=True, exist_ok=True)
-        self.out = open(d / f"{name}.log", "ab")
-        self.inp = open(d / f"{name}.input.log", "ab")
-        stamp = time.strftime("\n===== session %Y-%m-%d %H:%M:%S =====\n").encode()
-        self.out.write(stamp)
-        self.inp.write(stamp)
-
-    def output(self, b: bytes) -> None:
-        self.out.write(b)
-
-    def input(self, b: bytes) -> None:
-        self.inp.write(time.strftime("[%H:%M:%S] ").encode() + b.replace(b"\r", b"\\r") + b"\n")
-
-    def close(self) -> None:
-        self.out.close()
-        self.inp.close()
-
-
-async def _send_msg(ws: WebSocket, text: str) -> None:
-    await ws.send_bytes(f"\r\n\x1b[33m{text}\x1b[0m\r\n".encode())
+async def _send_msg(ws: WebSocket, text: str, rec: Recorder | None = None) -> None:
+    data = f"\r\n\x1b[33m{text}\x1b[0m\r\n".encode()
+    if rec is not None:
+        rec.output(data)          # 系統訊息也錄進去，重播時看得到
+    await ws.send_bytes(data)
 
 
 def looks_like_paste(data: bytes) -> bool:
@@ -57,7 +37,8 @@ async def serve(ws: WebSocket, account: dict, inst: dict, still_open, block_past
     """still_open(): 回傳 None 表示可繼續；回傳字串則顯示訊息並斷線"""
     cols = int(ws.query_params.get("cols", 100))
     rows = int(ws.query_params.get("rows", 30))
-    rec = _Recorder(account["participant_code"], f"s{inst['set_id']}-{inst['qid']}")
+    rec = Recorder(account["id"], inst["set_id"], inst["qid"], cols, rows,
+                   title=f"{account.get('participant_code') or account.get('username')} · {inst['qid']}")
     instances.active_shells[inst["vmid"]] += 1
     kicked = asyncio.Event()
     instances.shell_kicks[inst["vmid"]].add(kicked)
@@ -71,7 +52,7 @@ async def serve(ws: WebSocket, account: dict, inst: dict, still_open, block_past
                 known_hosts=None, connect_timeout=15, keepalive_interval=30)
         except Exception as e:  # noqa: BLE001
             await _send_msg(ws, _("無法連線到你的環境（{e}）。若改過 sshd / 帳號 {user} / 網路，請重置本題。",
-                                  e=e, user=cfg.ssh_user))
+                                  e=e, user=cfg.ssh_user), rec)
             return
         async with conn:
             proc = await conn.create_process(
@@ -94,7 +75,7 @@ async def serve(ws: WebSocket, account: dict, inst: dict, still_open, block_past
                     if msg.get("bytes") is not None:
                         data = msg["bytes"]
                         if block_paste and looks_like_paste(data):
-                            rec.input(b"[PASTE BLOCKED] " + data)
+                            rec.paste_blocked(data)
                             await ws.send_text(json.dumps({"type": "notice", "text": _("本次測驗禁止貼上")}))
                             continue
                         rec.input(data)
@@ -103,6 +84,7 @@ async def serve(ws: WebSocket, account: dict, inst: dict, still_open, block_past
                         m = json.loads(msg["text"])
                         if m.get("type") == "resize":
                             proc.change_terminal_size(int(m["cols"]), int(m["rows"]))
+                            rec.resize(m["cols"], m["rows"])
                         elif m.get("type") == "ping":
                             instances.touch(inst)
 
@@ -118,7 +100,7 @@ async def serve(ws: WebSocket, account: dict, inst: dict, still_open, block_past
                     except Exception:  # noqa: BLE001
                         pass
                     break
-                await _send_msg(ws, msg)
+                await _send_msg(ws, msg, rec)
 
             tasks = [asyncio.create_task(t()) for t in (pump_out, pump_in, deadline)]
             done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
@@ -138,19 +120,21 @@ async def serve(ws: WebSocket, account: dict, inst: dict, still_open, block_past
             pass
 
 
-async def _mock(ws: WebSocket, rec: _Recorder, inst: dict, still_open, kicked: asyncio.Event,
+async def _mock(ws: WebSocket, rec: Recorder, inst: dict, still_open, kicked: asyncio.Event,
                 block_paste: bool = False) -> None:
     """mock 模式：不連真實環境，輸入會回顯。輸入 `mock-pass [檢查id ...]` 讓之後的檢查通過（測試用）"""
     from .pve import client
-    await ws.send_bytes((_("（MOCK 模式：未連接真實環境，輸入會回顯）") + "\r\n$ ").encode())
+    banner = (_("（MOCK 模式：未連接真實環境，輸入會回顯）") + "\r\n$ ").encode()
+    rec.output(banner)
+    await ws.send_bytes(banner)
     line = b""
     while True:
         if kicked.is_set():
             await ws.send_text(json.dumps({"type": "paused"}))
-            await _send_msg(ws, _("你開啟了其他題目，本題環境已暫停（檔案都會保留）。要繼續作答請按「重新連線」。"))
+            await _send_msg(ws, _("你開啟了其他題目，本題環境已暫停（檔案都會保留）。要繼續作答請按「重新連線」。"), rec)
             return
         if (m := still_open()) is not None:
-            await _send_msg(ws, m)
+            await _send_msg(ws, m, rec)
             return
         try:
             msg = await asyncio.wait_for(ws.receive(), 1)
@@ -161,14 +145,15 @@ async def _mock(ws: WebSocket, rec: _Recorder, inst: dict, still_open, kicked: a
         if msg.get("bytes") is not None:
             data = msg["bytes"]
             if block_paste and looks_like_paste(data):
-                rec.input(b"[PASTE BLOCKED] " + data)
+                rec.paste_blocked(data)
                 await ws.send_text(json.dumps({"type": "notice", "text": _("本次測驗禁止貼上")}))
                 continue
             rec.input(data)
-            rec.output(data)
             line += data
             if b"\r" in line:
                 cmd, line = line.split(b"\r", 1)[0].decode("utf-8", "replace").strip(), b""
                 if cmd.startswith("mock-pass"):
                     client().mock_set_pass(inst["vmid"], cmd.split()[1:])
-            await ws.send_bytes(data.replace(b"\r", b"\r\n$ "))
+            echo = data.replace(b"\r", b"\r\n$ ")
+            rec.output(echo)
+            await ws.send_bytes(echo)

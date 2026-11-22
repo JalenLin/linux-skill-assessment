@@ -35,7 +35,8 @@ LSA_CONFIG=config.dev.yaml .venv/bin/uvicorn app.main:app --reload --port 8000
 | `app/pve.py` | PVE API 包裝（proxmoxer）；`MockPVE` 給 mock 模式 |
 | `app/grader.py` | 檢查排隊與執行（ansible-runner）、計分政策、成績計算 |
 | `app/attempts.py` | 單題限時與次數 |
-| `app/shell.py` | 終端機：WebSocket ↔ SSH（asyncssh）、輸入輸出紀錄、禁止貼上 |
+| `app/shell.py` | 終端機：WebSocket ↔ SSH（asyncssh）、禁止貼上 |
+| `app/recording.py` | 終端機紀錄：asciicast v2 錄製、輸入列表、純文字檢視、隨帳號／題組刪除 |
 | `app/security.py` | 密碼雜湊（scrypt）與隨機密碼；session 用 Starlette SessionMiddleware（`secret_key` 簽章） |
 | `app/i18n.py` | 多國語言 |
 | `app/templates/` | Jinja2 樣板（`admin/` 為後台） |

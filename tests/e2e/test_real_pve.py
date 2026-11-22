@@ -104,7 +104,15 @@ def test_switch_pauses_and_keeps_files(env):
         term.close()
 
 
-def test_participant_record_shows_terminal_log(env):
-    admin, p = env["admin"], env["p"]
-    html = admin.get(f"/admin/participant/{admin.account_id(env['user'])}").text
-    assert "e2e-mark.txt" in html or re.search(r"shell_log/\d+/", html), "終端機紀錄應該出現在作答者頁"
+def test_terminal_recordings(env):
+    """每次連線一筆 asciicast 紀錄；可以重播，輸入文字看得到下過的指令"""
+    admin = env["admin"]
+    aid = admin.account_id(env["user"])
+    html = admin.get(f"/admin/participant/{aid}").text
+    names = re.findall(rf"/admin/recording/{aid}/([^\"]+\.cast)", html)
+    assert len(names) >= 3, "三次終端機連線應該有三筆紀錄"
+    inputs = "".join(admin.get(f"/admin/shell_log/{aid}/{n}?view=input").text for n in names)
+    assert "e2e-mark.txt" in inputs and "systemctl is-active hello" in inputs
+    outputs = "".join(admin.get(f"/admin/shell_log/{aid}/{n}?view=output").text for n in names)
+    assert "keep-me" in outputs
+    assert admin.get(f"/admin/recording/{aid}/{names[0]}").status_code == 200

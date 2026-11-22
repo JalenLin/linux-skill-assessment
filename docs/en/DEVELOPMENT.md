@@ -35,7 +35,8 @@ after making changes, deploy to the test machine with `./deploy/deploy.sh`.
 | `app/pve.py` | PVE API wrapper (proxmoxer); `MockPVE` for mock mode |
 | `app/grader.py` | Check queueing and execution (ansible-runner), scoring policies, score calculation |
 | `app/attempts.py` | Per-question time limits and attempt counts |
-| `app/shell.py` | Terminal: WebSocket ↔ SSH (asyncssh), input/output logging, paste blocking |
+| `app/shell.py` | Terminal: WebSocket ↔ SSH (asyncssh), paste blocking |
+| `app/recording.py` | Terminal recordings: asciicast v2 capture, input list, plain-text views, deletion with account/set |
 | `app/security.py` | Password hashing (scrypt) and random passwords; sessions use Starlette SessionMiddleware (signed with `secret_key`) |
 | `app/i18n.py` | Multiple languages |
 | `app/templates/` | Jinja2 templates (`admin/` is the admin pages) |

@@ -45,6 +45,7 @@ def person(server, admin):
         prefix = prefix or f"t{_n[0]:02d}x"
         u, pw = next(iter(admin.generate(prefix, 1).items()))
         p = Participant(server, u, pw)
+        p.username = u
         p.code = f"C{_n[0]:04d}"
         r = p.bind(p.code)
         assert r.status_code == 303, r.text
@@ -227,6 +228,82 @@ def test_one_environment_at_a_time(admin, person):
     term.close()
     rows = [r for r in admin.get("/admin/instances").text.split("<tr>") if p.code in r]
     assert len(rows) == 2 and sum("running" in r for r in rows) == 1      # 兩個環境，只有一個在跑
+
+
+def test_terminal_recording_replay_and_cleanup(admin, person):
+    """終端機紀錄：每次連線一個 asciicast 檔、後台重播與文字檢視、刪題組／刪帳號時一併刪除"""
+    import json
+    sid = admin.create_set("Recording", "practice", block_paste="on")
+    admin.add_question(sid, Q)
+    p = person()
+    aid = admin.account_id(p.username)
+    assert p.api(sid, Q, "start")["ok"]
+    term = p.terminal(sid, Q)
+    term.read(until="$ ")
+    for line in ("ls -l /srv\r", "echo 這是測試\r"):            # 一個字一個字打（一次送很多字會被當成貼上）
+        for ch in line:
+            term.send(ch)
+        term.read(until="$ ")
+    term.send("cat /etc/passwd | grep root")                   # 一次送很多字 → 視為貼上，被擋
+    term.read(timeout=2)
+    term.close()
+    time.sleep(0.5)
+
+    page = admin.get(f"/admin/participant/{aid}").text
+    names = re.findall(rf'/admin/recording/{aid}/(s{sid}-{Q}-[0-9-]+\.cast)', page)
+    assert len(names) == 1 and "Recording" in page
+    name = names[0]
+
+    cast = admin.get(f"/admin/shell_log/{aid}/{name}?view=cast")
+    assert cast.status_code == 200 and "attachment" in cast.headers["content-disposition"]
+    lines = cast.text.splitlines()
+    header = json.loads(lines[0])
+    assert header["version"] == 2 and header["width"] == 120 and header["height"] == 30
+    events = [json.loads(x) for x in lines[1:]]
+    kinds = {e[1] for e in events}
+    assert {"o", "i", "m"} <= kinds
+    assert all(events[i][0] <= events[i + 1][0] for i in range(len(events) - 1))
+    assert "echo 這是測試\r" in "".join(e[2] for e in events if e[1] == "i")
+
+    inp = admin.get(f"/admin/shell_log/{aid}/{name}?view=input").text
+    assert "ls -l /srv ⏎" in inp and "echo 這是測試 ⏎" in inp and "PASTE BLOCKED: cat /etc/passwd" in inp
+    assert "MOCK" in admin.get(f"/admin/shell_log/{aid}/{name}?view=output").text
+    player = [json.loads(x) for x in admin.get(f"/admin/shell_log/{aid}/{name}?view=player").text.splitlines()[1:]]
+    assert [e[2] for e in player if e[1] == "m"][:2] == ["ls -l /srv ⏎", "echo 這是測試 ⏎"]
+
+    rp = admin.get(f"/admin/recording/{aid}/{name}")
+    assert rp.status_code == 200 and "asciinema-player.min.js" in rp.text and "ls -l /srv" in rp.text
+    assert admin.get("/static/vendor/asciinema-player.min.js").status_code == 200
+    # 不合法的檔名
+    assert admin.get(f"/admin/shell_log/{aid}/..%2F..%2Flsa.db").status_code == 404
+    assert admin.get(f"/admin/shell_log/{aid}/x.log").status_code == 404
+
+    admin.delete_set(sid, "Recording")                          # 刪題組 → 紀錄一起刪
+    assert f"/admin/recording/{aid}/" not in admin.get(f"/admin/participant/{aid}").text
+    assert admin.get(f"/admin/shell_log/{aid}/{name}?view=cast").status_code == 404
+
+    sid2 = admin.create_set("Recording 2", "practice")          # 刪帳號 → 紀錄一起刪
+    admin.add_question(sid2, Q)
+    assert p.api(sid2, Q, "start")["ok"]
+    term = p.terminal(sid2, Q)
+    term.read(until="$ ")
+    term.close()
+    time.sleep(0.5)
+    name2 = re.findall(rf'/admin/recording/{aid}/([^"]+\.cast)', admin.get(f"/admin/participant/{aid}").text)[0]
+    admin.delete_set(sid2, "Recording 2")
+    sid3 = admin.create_set("Recording 3", "practice")
+    admin.add_question(sid3, Q)
+    assert p.api(sid3, Q, "start")["ok"]
+    term = p.terminal(sid3, Q)
+    term.read(until="$ ")
+    term.close()
+    time.sleep(0.5)
+    name3 = re.findall(rf'/admin/recording/{aid}/([^"]+\.cast)', admin.get(f"/admin/participant/{aid}").text)[0]
+    assert name3 != name2
+    admin.post(f"/admin/sets/{sid3}/destroy_instances", data={"confirm": "DELETE"})
+    r = admin.post(f"/admin/accounts/{aid}/delete")
+    assert r.status_code == 303
+    assert admin.get(f"/admin/shell_log/{aid}/{name3}?view=cast").status_code == 404
 
 
 # ---------------- 測驗 ----------------

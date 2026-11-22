@@ -326,5 +326,17 @@
  "用另一個瀏覽器（或無痕視窗）以作答者身分登入，綁定編號後開題試做": "Log in as a participant in another browser (or a private window), bind an ID and try a question",
  "回到這裡看成績、出席與運作中的環境": "Come back here to see scores, attendance and running environments",
  "建立題組": "Create a question set",
- "完整說明見管理者操作手冊（docs/ADMIN.md）。": "See the administrator guide (docs/ADMIN.md) for details."
+ "完整說明見管理者操作手冊（docs/ADMIN.md）。": "See the administrator guide (docs/ADMIN.md) for details.",
+ "下載 .cast": "Download .cast",
+ "每次連上終端機會產生一筆紀錄。刪除帳號或題組時，相關紀錄會一併刪除。": "Each terminal connection creates one recording. Recordings are deleted together with the account or question set.",
+ "沒有輸入": "No input",
+ "畫面文字": "Screen text",
+ "終端機重播": "Terminal replay",
+ "貼上被擋": "Paste blocked",
+ "貼上被擋 {n} 次": "Paste blocked {n}×",
+ "輸入": "Input",
+ "輸入文字": "Input text",
+ "重播": "Replay",
+ "長度": "Length",
+ "閒置超過 2 秒的片段會縮短。進度條上的標記是每一行輸入；點右邊的列表可以跳到該時間。": "Idle periods longer than 2 seconds are shortened. Markers on the progress bar are input lines; click an entry in the list to jump to it."
 }

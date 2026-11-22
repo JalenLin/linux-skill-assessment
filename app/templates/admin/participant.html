@@ -22,7 +22,17 @@
   </table>
   {% endif %}
   <h3>{{ _("終端機紀錄") }}</h3>
-  <p>{% for l in logs %}<a href="/admin/shell_log/{{ acc.id }}/{{ l }}" target="_blank">{{ l }}</a>　{% else %}<span class="muted">{{ _("無") }}</span>{% endfor %}</p>
+  <table>
+    <tr><th>{{ _("開始") }}</th><th>{{ _("題組") }}</th><th>{{ _("題目") }}</th><th>{{ _("長度") }}</th><th>{{ _("輸入") }}</th><th></th></tr>
+    {% for l in logs %}<tr><td class="muted">{{ l.started }}</td><td>{{ l.set_name }}</td><td>{{ l.qid }}</td>
+      <td>{{ "%d:%02d" % (l.duration // 60, l.duration % 60) }}</td>
+      <td>{{ l.inputs }}{% if l.blocked %} <span class="tag failed">{{ _("貼上被擋 {n} 次", n=l.blocked) }}</span>{% endif %}</td>
+      <td><a href="/admin/recording/{{ acc.id }}/{{ l.name }}">{{ _("重播") }}</a> ·
+        <a href="/admin/shell_log/{{ acc.id }}/{{ l.name }}?view=input" target="_blank">{{ _("輸入文字") }}</a> ·
+        <a href="/admin/shell_log/{{ acc.id }}/{{ l.name }}?view=cast">.cast</a></td></tr>
+    {% else %}<tr><td colspan="6" class="muted">{{ _("無") }}</td></tr>{% endfor %}
+  </table>
+  <p class="muted">{{ _("每次連上終端機會產生一筆紀錄。刪除帳號或題組時，相關紀錄會一併刪除。") }}</p>
 </div>
 <div class="card">
   <h2>{{ _("活動紀錄") }} <span class="muted" style="font-size:14px;font-weight:normal">{{ _("最近 200 筆（出席依據）") }}</span></h2>
