@@ -144,6 +144,7 @@ free -m; uptime                                        # memory, load
 ## Known limitations
 
 - Single PVE host only; clustering is not supported
+- With the default `local-lvm`, the whole system hits the LVM metadata limit at about 1100 instances; see [Storage (LVM) limits](#storage-lvm-limits)
 - After a template is rebuilt, the old template is kept if participant instances still use it; when those instances are later deleted, the old template is not deleted automatically.
   Delete it manually in PVE when needed (`tmpl-<question id>`, VMID 9100 or above, the one not shown on the admin Question bank page)
 - When the service restarts, checks in progress are interrupted (the participant just presses it again); do not update the application during an assessment

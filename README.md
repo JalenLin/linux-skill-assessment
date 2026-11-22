@@ -93,6 +93,17 @@ echo 'PVE=root@<PVE IP>' > deploy/deploy.env
 
 詳細步驟見 [docs/INSTALL.md](docs/INSTALL.md)。
 
+## 容量（實測）
+
+Intel N305（8 核）、48GB RAM、NVMe，60 人同時作答、12 題（9 題 LXC、3 題 VM）：
+
+- LXC 環境約 50MB 記憶體，VM 環境約 450MB
+- 每位作答者同時只開 1 個環境（預設），60 人在 48GB 內綽綽有餘
+- 60 台 VM 同時開機 CPU 會滿載 2~3 分鐘；大量同時檢查時終端機仍順暢（< 0.3 秒）
+- ⚠ 預設的 LVM-thin 大約只能容納 **1100 個實例**，超過後無法建立環境（與硬碟剩餘空間無關）；題組結束後請刪除實例
+
+詳見 [docs/OPERATIONS.md](docs/OPERATIONS.md)。
+
 ## 題目
 
 本 repo **只附一題範例題** [`questions/example-hello`](questions/example-hello)（示範所有欄位），

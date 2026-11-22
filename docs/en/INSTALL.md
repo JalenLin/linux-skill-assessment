@@ -34,9 +34,17 @@ This guide takes you from an empty Proxmox VE host to participants being able to
 - When 60 VMs boot at the same time, the CPU is saturated for 2–3 minutes; during normal work and checking, CPU load is light
 - Rough memory estimate: `4GB (system + web) + participants × 0.45GB` (assuming everyone is working on a VM question)
 
+> ⚠ **Instance count limit**: the default `local-lvm` holds only about **1100 instances** (LVM metadata is fixed when PVE
+> is installed and cannot be enlarged). Beyond that, creating environments fails no matter how much disk space is free.
+> Count it as "participants × questions"; instances of practice sets keep accumulating, so delete a set's instances once
+> it is over. See [OPERATIONS.md](OPERATIONS.md#storage-lvm-limits).
+
 ## 2. Install Proxmox VE
 
 1. Install PVE following the official instructions, using the default LVM-thin (`local-lvm`)
+   - If you expect more than about 1000 instances to exist at once (e.g. 100 participants × 12 questions), choose **ZFS**
+     during installation, or prepare a separate disk as storage with a large metadata area (see
+     [OPERATIONS.md](OPERATIONS.md#storage-lvm-limits)); this cannot be changed after installation
 2. During installation, set the IP of vmbr0 (on the network segment participants can reach)
 3. After installation, update packages: `apt update && apt full-upgrade`
 
