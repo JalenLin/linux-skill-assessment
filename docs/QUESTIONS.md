@@ -58,6 +58,7 @@ example-hello/            資料夾名稱 = 題目 id（小寫英數與 -）
 
 ```yaml
 title: The hello service won't start (example)
+tags: [systemd, web, example]
 type: lxc            # lxc（容器，預設）或 vm
 hostname: hello      # 作答者看到的主機名稱
 resources:
@@ -86,6 +87,7 @@ i18n:                # 選用：其他語言（見「多國語言」）
 範例題以英文為主要語言、附繁體中文翻譯；你的題目用中文為主的話，`lang` 不寫（預設 `zh-TW`），
 `title`、`desc` 寫中文，翻譯放在 `i18n: en:`。
 
+- `tags`（選用）：分類標籤，只給管理者在題庫頁、題組頁篩選用，作答者看不到；也可以在後台題庫頁編輯（會改寫這個檔案）
 - `checks` 的 `desc` 是作答者看到的檢查項目說明（題組設定「作答者可看到每個檢查項目是否通過」時）
 - VM 題可以加額外磁碟：`resources` 底下加 `extra_disks: [2]`（單位 GB，依序成為 `/dev/sdb`、`/dev/sdc`…）
 

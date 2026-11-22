@@ -43,8 +43,19 @@ def _render(request: Request, name: str, ctx: dict, status_code: int = 200):
 
 def _back(url: str, msg: str = "") -> RedirectResponse:
     from urllib.parse import quote
+    url, _sep, anchor = url.partition("#")
     sep = "&" if "?" in url else "?"
-    return RedirectResponse(url + (f"{sep}msg={quote(msg)}" if msg else ""), status_code=303)
+    return RedirectResponse(url + (f"{sep}msg={quote(msg)}" if msg else "") + (f"#{anchor}" if anchor else ""),
+                            status_code=303)
+
+
+def _all_tags(qs) -> list[str]:
+    """題庫裡所有標籤（不分大小寫去重複，依字母排序）"""
+    seen: dict[str, str] = {}
+    for q in qs:
+        for t in q.tags:
+            seen.setdefault(t.lower(), t)
+    return sorted(seen.values(), key=str.lower)
 
 
 def _spawn(coro) -> None:
@@ -299,7 +310,7 @@ async def set_detail(request: Request, sid: int):
                                        (sid, q.qid))["n"]})
     items.sort(key=lambda i: (not i["e"]["enabled"], i["e"]["sort_order"], i["q"].qid))
     return _render(request, "admin/set_detail.html", {
-        "st": st, "items": items, "state": sets.state(st), "participant_state": sets.participant_state(st),
+        "st": st, "items": items, "all_tags": _all_tags(qs.values()), "state": sets.state(st), "participant_state": sets.participant_state(st),
         "total": sum(sum(c.points for c in i["checks"]) for i in items if i["e"]["enabled"])})
 
 
@@ -348,6 +359,24 @@ async def set_question_save(request: Request, sid: int, qid: str):
         (sid, qid, int(f.get("enabled") == "on"), int(f.get("sort_order") or 0), json.dumps(pts),
          max(0, int(f.get("time_limit_min") or 0)), max(0, int(f.get("max_attempts") or 0))))
     return _back(f"/admin/sets/{sid}", _("{qid} 已更新", qid=qid))
+
+
+@router.post("/sets/{sid}/bulk")
+async def set_bulk(request: Request, sid: int):
+    """勾選多題一次納入／移出（移出只是取消勾選「納入」，該題的配分、限時等設定保留）"""
+    require_admin(request)
+    if sets.get(sid) is None:
+        return _back("/admin/sets", _("題組不存在"))
+    f = await request.form()
+    action = f.get("action")
+    qids = [q for q in f.getlist("qid") if questions.get(str(q))]
+    if action not in ("include", "exclude") or not qids:
+        return _back(f"/admin/sets/{sid}", _("請先勾選題目"))
+    on = int(action == "include")
+    for qid in qids:
+        db.execute("INSERT INTO set_questions(set_id,qid,enabled) VALUES(?,?,?) "
+                   "ON CONFLICT(set_id,qid) DO UPDATE SET enabled=excluded.enabled", (sid, qid, on))
+    return _back(f"/admin/sets/{sid}", _("已納入 {n} 題", n=len(qids)) if on else _("已移出 {n} 題", n=len(qids)))
 
 
 @router.post("/sets/{sid}/extend")
@@ -456,7 +485,7 @@ async def questions_page(request: Request):
                       "building": q.qid in build.building, "n_inst": n_inst,
                       "outdated": bool(t and t.get("version") and t["version"] != q.build_version)})
     items.sort(key=lambda i: i["q"].qid)
-    return _render(request, "admin/questions.html", {"items": items, "bad": bad})
+    return _render(request, "admin/questions.html", {"items": items, "bad": bad, "all_tags": _all_tags(qs.values())})
 
 
 @router.get("/questions/{qid}/status.json")
@@ -480,6 +509,19 @@ async def question_detail(request: Request, qid: str):
     return _render(request, "admin/question_detail.html", {
         "q": q, "t": t, "files": files, "building": qid in build.building,
         "selftest": json.loads(t["selftest_json"]) if t and t.get("selftest_json") else None})
+
+
+@router.post("/questions/{qid}/tags")
+async def question_tags(request: Request, qid: str, tags: str = Form("")):
+    """改寫題目 question.yaml 的 tags（匯出 zip 也會帶著）"""
+    require_admin(request)
+    if questions.get(qid) is None:
+        return _back("/admin/questions", _("題目不存在"))
+    try:
+        new = questions.set_tags(qid, tags.split(","))
+    except questions.QuestionError as e:
+        return _back(f"/admin/questions#q-{qid}", _("{qid} 標籤未儲存：{e}", qid=qid, e=str(e)))
+    return _back(f"/admin/questions#q-{qid}", _("{qid} 標籤已更新：{tags}", qid=qid, tags=", ".join(new) or "—"))
 
 
 @router.post("/questions/{qid}/build")

@@ -58,6 +58,7 @@ These map to three check items (`checks` in `question.yaml`):
 
 ```yaml
 title: The hello service won't start (example)
+tags: [systemd, web, example]
 type: lxc            # lxc (container, default) or vm
 hostname: hello      # host name participants see
 resources:
@@ -85,6 +86,7 @@ i18n:                # optional: other languages (see "Multiple languages")
 
 (The example's main language is English with a Traditional Chinese translation in `i18n.zh-TW`.)
 
+- `tags` (optional): category tags, used only by administrators to filter on the question bank and question set pages; participants never see them. They can also be edited on the admin question bank page (which rewrites this file)
 - The `desc` of each check is the check-item description participants see (when the question set setting "Participants can see whether each check item passed" is on)
 - VM questions can have extra disks: add `extra_disks: [2]` under `resources` (in GB; they become `/dev/sdb`, `/dev/sdc`, … in order)
 

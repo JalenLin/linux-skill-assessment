@@ -1,6 +1,7 @@
 # Example question: shows every field of a question package. Copy this folder, rename it and change
 # the contents to make your own question. Folder name = question id (lowercase letters, digits and -).
 title: The hello service won't start (example)
+tags: [systemd, web, example]   # optional: labels for filtering in the admin UI (participants never see them)
 type: lxc            # lxc (container; default, light) or vm (needs kernel features: disks, NFS server, kernel modules…)
 hostname: hello      # hostname the participant sees
 resources:

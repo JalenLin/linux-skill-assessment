@@ -20,7 +20,7 @@ def t(**kw) -> str:
 
 def flash(r: requests.Response) -> str:
     """後台操作後 redirect 帶的訊息"""
-    m = re.search(r"msg=([^&]+)", r.headers.get("location", ""))
+    m = re.search(r"msg=([^&#]+)", r.headers.get("location", ""))
     return unquote(m.group(1)) if m else ""
 
 

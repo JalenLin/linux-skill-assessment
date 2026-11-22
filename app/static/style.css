@@ -136,3 +136,16 @@ details[open] > summary.rec-row > span:first-child::before { content: "▾ "; }
 summary.rec-row:hover { background: rgba(127, 127, 127, .08); }
 .rec-sessions { margin: 0 0 8px 20px; width: calc(100% - 20px); }
 @media (max-width: 700px) { .rec-row { grid-template-columns: 1fr 1fr; } .rec-head { display: none; } }
+/* 題目標籤與篩選 */
+.qfilter { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.qfilter .qf-search { max-width: 320px; }
+.qfilter select { width: auto; }
+.qf-tags { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.qf-tag, .qtag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; line-height: 1.6;
+  border: 1px solid rgba(127, 127, 127, .35); background: transparent; color: inherit; cursor: pointer; text-decoration: none; margin: 2px 4px 2px 0; }
+.qf-tag.on { background: #0969da; border-color: #0969da; color: #fff; }
+.qtag:hover, .qf-tag:hover { border-color: #0969da; }
+.qtags-edit { margin: 4px 0 8px; }
+.qtags-edit details { display: inline-block; margin-left: 6px; vertical-align: middle; }
+.qtags-edit details[open] { display: block; margin-left: 0; }
+[data-q][hidden] { display: none !important; }

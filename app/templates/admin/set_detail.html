@@ -49,11 +49,20 @@
 <div class="card">
   <h2>{{ _("題目") }} <span class="muted" style="font-size:14px;font-weight:normal">{{ _("已納入的合計 {n} 分", n='%g' % total) }}</span></h2>
   <p class="muted">{{ _("勾選「納入」並儲存，該題就會出現在這個題組。單題限時 0 = 不限時（在題組開放時間內自由作答）。") }}</p>
-  <table>
-    <tr><th>{{ _("題目") }}</th><th>{{ _("範本") }}</th><th>{{ _("設定") }}</th></tr>
+  {% set fsel = "#set-questions" %}{% set fstate = true %}{% include "admin/_qfilter.html" %}
+  <form id="bulk" method="post" action="/admin/sets/{{ st.id }}/bulk" class="actions" style="margin-top:0">
+    <button class="primary" name="action" value="include">{{ _("納入勾選的題目") }}</button>
+    <button name="action" value="exclude">{{ _("移出勾選的題目") }}</button>
+    <span class="muted">{{ _("移出只是不納入，該題的配分、限時等設定會保留。") }}</span>
+  </form>
+  <table id="set-questions">
+    <tr><th><input type="checkbox" class="qf-all" title="{{ _("全選目前顯示的題目") }}"></th><th>{{ _("題目") }}</th><th>{{ _("範本") }}</th><th>{{ _("設定") }}</th></tr>
     {% for it in items %}{% set q = it.q %}
-    <tr>
-      <td><b>{{ q.title_in() }}</b><br><span class="muted">{{ q.qid }} · {{ 'LXC' if q.kind == 'lxc' else 'VM' }}{% if it.n_inst %} · {{ _("實例 {n}", n=it.n_inst) }}{% endif %}</span></td>
+    <tr data-q="{{ q.qid }}" data-in="{{ 1 if it.e.enabled else 0 }}" data-tags="{{ q.tags | map('lower') | list | tojson | forceescape }}"
+        data-search="{{ (q.qid ~ ' ' ~ q.title ~ ' ' ~ q.title_in() ~ ' ' ~ q.tags | join(' ')) | lower }}">
+      <td><input type="checkbox" class="qf-pick" form="bulk" name="qid" value="{{ q.qid }}"></td>
+      <td><b>{{ q.title_in() }}</b>{% if it.e.enabled %} <span class="tag running">{{ _("已納入") }}</span>{% endif %}<br><span class="muted">{{ q.qid }} · {{ 'LXC' if q.kind == 'lxc' else 'VM' }}{% if it.n_inst %} · {{ _("實例 {n}", n=it.n_inst) }}{% endif %}</span>
+        {% for t in q.tags %}<a href="#" class="qtag" data-tag="{{ t | lower }}">{{ t }}</a>{% endfor %}</td>
       <td>{% if it.ready %}<span class="tag running">ready</span>{% else %}<a class="tag" href="/admin/questions">{{ _("未建置") }}</a>{% endif %}</td>
       <td>
         <form method="post" action="/admin/sets/{{ st.id }}/q/{{ q.qid }}">
@@ -102,3 +111,4 @@
   </form>
 </div>
 {% endblock %}
+{% block scripts %}<script src="/static/qfilter.js"></script>{% endblock %}

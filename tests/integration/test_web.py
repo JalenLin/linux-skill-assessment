@@ -416,6 +416,43 @@ def test_question_status_and_export(admin):
     assert r.status_code == 200 and r.content[:2] == b"PK"
 
 
+def test_tags_edit_filter_and_bulk(admin):
+    """網頁改標籤會寫回 question.yaml（匯出 zip 帶著）；題組頁可以勾選批次納入／移出"""
+    import zipfile
+    page = admin.get("/admin/questions").text
+    assert 'data-tag="systemd"' in page and 'class="qf-search"' in page      # 範例題本身的標籤
+
+    r = admin.post(f"/admin/questions/{Q2}/tags", data={"tags": "network, 入門, Network"})
+    assert r.status_code == 303 and f"#q-{Q2}" in r.headers["location"]
+    assert "標籤已更新" in flash(r)
+    page = admin.get("/admin/questions").text
+    assert 'data-tag="入門"' in page and page.count('class="qf-tag" data-tag="network"') == 1
+    z = zipfile.ZipFile(io.BytesIO(admin.get(f"/admin/questions/{Q2}/export.zip").content))
+    yml = next(n for n in z.namelist() if n.endswith("question.yaml"))
+    text = z.read(yml).decode()
+    assert 'tags: ["network", "入門"]' in text and "# " in text                 # 註解還在
+    assert admin.get(f"/admin/questions/{Q2}/status.json").json()["template"]["status"] == "ready"   # 不需要重建
+
+    r = admin.post(f"/admin/questions/{Q2}/tags", data={"tags": "a, " + "z" * 31})
+    assert "標籤未儲存" in flash(r)
+
+    sid = admin.create_set("Bulk", "practice")
+    r = admin.post(f"/admin/sets/{sid}/bulk", data={"action": "include", "qid": [Q, Q2]})
+    assert "已納入 2 題" in flash(r)
+    page = admin.get(f"/admin/sets/{sid}").text
+    assert page.count('data-in="1"') == 2 and 'name="qid"' in page
+    admin.add_question(sid, Q, time_limit_min=15)              # 單題設定
+    r = admin.post(f"/admin/sets/{sid}/bulk", data={"action": "exclude", "qid": [Q]})
+    assert "已移出 1 題" in flash(r)
+    page = admin.get(f"/admin/sets/{sid}").text
+    assert page.count('data-in="1"') == 1
+    admin.post(f"/admin/sets/{sid}/bulk", data={"action": "include", "qid": [Q]})
+    assert 'name="time_limit_min" min="0" value="15"' in admin.get(f"/admin/sets/{sid}").text   # 設定保留
+    assert "請先勾選題目" in flash(admin.post(f"/admin/sets/{sid}/bulk", data={"action": "include"}))
+    admin.post(f"/admin/questions/{Q2}/tags", data={"tags": ""})
+    admin.delete_set(sid, "Bulk")
+
+
 def test_upload_bad_zip(admin):
     r = admin.post("/admin/questions/upload", files={"file": ("x.zip", b"not a zip", "application/zip")})
     assert "上傳失敗" in flash(r)

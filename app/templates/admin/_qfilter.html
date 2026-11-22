@@ -1,0 +1,12 @@
+{# 題目篩選列：fsel = 題目所在的容器；fstate = 是否顯示「已納入／未納入」選單 #}
+<div class="qfilter" data-qfilter="{{ fsel }}">
+  <input type="text" class="qf-search" placeholder="{{ _("搜尋題目 id、標題、標籤") }}">
+  {% if fstate %}<select class="qf-state">
+    <option value="">{{ _("全部題目") }}</option>
+    <option value="1">{{ _("已納入") }}</option>
+    <option value="0">{{ _("未納入") }}</option>
+  </select>{% endif %}
+  <span class="qf-count muted" data-fmt="{{ _("顯示 {n} / {total} 題") }}"></span>
+  {% if all_tags %}<div class="qf-tags"><span class="muted">{{ _("標籤：") }}</span>{% for t in all_tags %}<button type="button" class="qf-tag" data-tag="{{ t | lower }}">{{ t }}</button>{% endfor %}
+    <span class="muted">{{ _("（選多個 = 全部符合）") }}</span></div>{% endif %}
+</div>

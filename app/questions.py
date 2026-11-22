@@ -58,6 +58,7 @@ class Question:
     lang: str = "zh-TW"            # 主要內容（title / description.md / checks.desc）的語言
     # 其他語言：{代碼: {"title": str, "checks": {id: desc}, "description_md": str}}
     translations: dict[str, dict] = field(default_factory=dict)
+    tags: list[str] = field(default_factory=list)   # 分類標籤（只給管理者篩選用，作答者看不到）
 
     @property
     def description_html(self) -> str:
@@ -127,6 +128,9 @@ def load_one(qdir: Path) -> Question:
         checks.append(Check(cid, str(c.get("desc", cid)), float(c.get("points", 0))))
     if not checks:
         errors.append("沒有定義 checks")
+    tags, tag_err = parse_tags(meta.get("tags"))
+    if tag_err:
+        errors.append(tag_err)
     main_lang = normalize_code(meta.get("lang") or "zh-TW")   # zh_TW 與 zh-TW 都接受
     translations: dict[str, dict] = {}
     for code, tr in (meta.get("i18n") or {}).items():
@@ -163,7 +167,72 @@ def load_one(qdir: Path) -> Question:
         errors=errors,
         lang=main_lang,
         translations=translations,
+        tags=tags,
     )
+
+
+# ---------------- 標籤 ----------------
+TAG_MAX = 30
+
+
+def parse_tags(v) -> tuple[list[str], str | None]:
+    """question.yaml 的 tags：list 或逗號分隔字串 → 去空白、去重複（保留順序）"""
+    if v is None:
+        return [], None
+    if isinstance(v, str):
+        v = v.split(",")
+    if not isinstance(v, list):
+        return [], "tags 必須是清單，例如 tags: [systemd, network]"
+    out: list[str] = []
+    for x in v:
+        t = re.sub(r"\s+", " ", str(x)).strip()
+        if not t:
+            continue
+        if len(t) > TAG_MAX or "," in t:
+            return out, f"標籤不合法（最多 {TAG_MAX} 字、不能有逗號）：{t}"
+        if t.lower() not in (o.lower() for o in out):
+            out.append(t)
+    return out, None
+
+
+# 頂層的 tags: 加上後面縮排（或以 "- " 開頭）的續行
+_TAGS_BLOCK = re.compile(r"^tags[ \t]*:.*(?:\n(?:[ \t]+\S.*|-[ \t].*))*", re.M)
+
+
+def set_tags(qid: str, tags: list[str]) -> list[str]:
+    """改寫題目的 question.yaml：只換掉頂層的 tags（沒有就加在 title 後面），其他內容與註解不動。
+    寫入前重新解析確認除了 tags 以外完全一樣，否則不寫。回傳整理後的標籤。"""
+    if not QID_RE.match(qid):
+        raise QuestionError("題目 id 不合法")
+    tags, err = parse_tags(tags)
+    if err:
+        raise QuestionError(err)
+    p = cfg.questions_path / qid / "question.yaml"
+    old = p.read_text(encoding="utf-8")
+    before = yaml.safe_load(old) or {}
+    line = ("tags: " + json.dumps(tags, ensure_ascii=False)) if tags else ""
+    m = _TAGS_BLOCK.search(old)
+    if m:
+        start, end = m.start(), m.end()
+        if not line and old[end:end + 1] == "\n":
+            end += 1                                # 刪除：連同這一行的換行
+        new = old[:start] + line + old[end:]
+    elif line:
+        t = re.search(r"^title[ \t]*:.*$", old, re.M)
+        if t:
+            new = old[:t.end()] + "\n" + line + old[t.end():]
+        else:
+            new = old.rstrip("\n") + "\n" + line + "\n"
+    else:
+        return tags
+    after = yaml.safe_load(new) or {}
+    want = {k: v for k, v in before.items() if k != "tags"}
+    if {k: v for k, v in after.items() if k != "tags"} != want or (parse_tags(after.get("tags"))[0] != tags):
+        raise QuestionError("無法安全地改寫 question.yaml 的 tags，請直接編輯檔案")
+    tmp = p.with_suffix(".yaml.tmp")
+    tmp.write_text(new, encoding="utf-8")
+    tmp.replace(p)
+    return tags
 
 
 def load_all() -> tuple[dict[str, Question], dict[str, str]]:

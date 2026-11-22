@@ -14,12 +14,25 @@
   <div class="card"><b class="bad">{{ _("{name} 載入失敗", name=name) }}</b>{{ _("：") }}{{ tr_stored(err) }}</div>
 {% endfor %}
 
+{% if items %}<div class="card">{% set fsel = "#qbank" %}{% set fstate = false %}{% include "admin/_qfilter.html" %}</div>{% endif %}
+<div id="qbank">
 {% for it in items %}
 {% set q = it.q %}
-<div class="card">
+<div class="card" id="q-{{ q.qid }}" data-q="{{ q.qid }}" data-tags="{{ q.tags | map('lower') | list | tojson | forceescape }}"
+     data-search="{{ (q.qid ~ ' ' ~ q.title ~ ' ' ~ q.title_in() ~ ' ' ~ q.tags | join(' ')) | lower }}">
   <h2><a href="/admin/questions/{{ q.qid }}">{{ q.title_in() }}</a>
     <span class="muted" style="font-size:14px;font-weight:normal">{{ q.qid }} · {{ 'LXC' if q.kind == 'lxc' else 'VM' }}
       · {{ q.resources.cores }}C/{{ q.resources.memory }}MB · {{ _("作答者實例 {n}", n=it.n_inst) }}</span></h2>
+  <form class="qtags-edit" method="post" action="/admin/questions/{{ q.qid }}/tags">
+    {% for t in q.tags %}<a href="#" class="qtag" data-tag="{{ t | lower }}">{{ t }}</a>{% else %}<span class="muted">{{ _("沒有標籤") }}</span>{% endfor %}
+    <details><summary class="muted">{{ _("編輯標籤") }}</summary>
+      <div class="actions" style="align-items:center">
+        <input type="text" name="tags" value="{{ q.tags | join(', ') }}" placeholder="systemd, network" style="max-width:360px">
+        <button>{{ _("儲存標籤") }}</button>
+      </div>
+      <p class="muted">{{ _("用逗號分隔。會直接改寫這題的 question.yaml（匯出 zip 也會帶著）；如果你用 git 管理題目，請記得同步回本機，否則下次 push-questions.sh 會蓋掉。") }}</p>
+    </details>
+  </form>
   {% for e in q.errors %}<div class="error">⚠ {{ tr_stored(e) }}</div>{% endfor %}
   <p>{{ _("範本：") }}
     {% if it.building %}<span class="tag building">{{ _("建置/測試中") }}</span>
@@ -46,4 +59,6 @@
 {% else %}
 <div class="card muted">{{ _("題庫是空的，請上傳題目包。") }}</div>
 {% endfor %}
+</div>
 {% endblock %}
+{% block scripts %}<script src="/static/qfilter.js"></script>{% endblock %}

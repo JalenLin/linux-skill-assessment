@@ -47,6 +47,11 @@ Participant accounts are **issued in advance**: the administrator generates acco
 - If a question's `setup.yml` / `files/` changes, it is marked as **needing a rebuild**; changes to only the description, check.yml, or translations do not require a rebuild
 - On the question page you can view the build log, preview the question, export a zip, or delete it
 - The question bank page lists which question sets use each question
+- **Tags**: each question can have a few category tags (e.g. `systemd`, `network`, `beginner`); the question bank and question set pages
+  can filter by tag and keyword. Tags live in the question's `question.yaml` (`tags:`) and can also be changed with "Edit tags" on the
+  question bank page, which rewrites that question's `question.yaml` directly (nothing else in the file, including comments, changes;
+  exported zips include it; no rebuild needed). If you keep questions in git, sync web edits back to your copy, or the next
+  `push-questions.sh` will overwrite them with your local version. Only administrators see tags
 
 > Rebuilding a template does **not** affect instances already handed out to participants (they were cloned from the old template).
 > To make participants use the new version, you must delete that question set's instances (they are recreated the next time a participant opens the question).
@@ -71,6 +76,12 @@ You can add question sets on the "Question sets (assessment/practice)" page. Whe
 ### Per-question settings
 
 In the question table at the bottom of the question set page: check "Include" and save, and the question appears in this question set.
+
+With many questions:
+
+- Above the table you can filter by **keyword** (question id, title, tags), **tag** (several = must match all) and **included / not included**; clicking a tag on a question also filters by it
+- Tick the boxes on the left (the header box selects all questions currently shown) and press "**Include selected**" or "**Remove selected**" to handle them at once;
+  removing only excludes the question, its points, time limit and other settings are kept
 
 | Field | Description |
 |---|---|
