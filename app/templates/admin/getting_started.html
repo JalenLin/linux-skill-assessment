@@ -1,0 +1,24 @@
+{% extends "admin/base.html" %}
+{% block admin %}
+<div class="card">
+  <h2>{{ _("開始使用") }}</h2>
+  <p>{{ _("還沒有任何題組。成績總覽會顯示題組的成績，請依下列步驟建立第一個題組：") }}</p>
+  {% macro mark(done) %}<b class="{{ 'ok' if done else 'muted' }}">{{ '✓' if done else '○' }}</b>{% endmacro %}
+  <ol class="steps">
+    <li>{{ mark(n_ready > 0) }} <a href="/admin/questions">{{ _("題庫") }}</a>{{ _("：每一題按「建置範本＋自我測試」") }}
+      <span class="muted">{{ _("（已建置 {ready} / {total} 題）", ready=n_ready, total=n_questions) }}</span></li>
+    <li>{{ mark(false) }} <a href="/admin/sets">{{ _("題組") }}</a>{{ _("：新增題組、放入題目，並勾選「作答者可見」") }}
+      <span class="muted">{{ _("（練習可以不設時間；測驗要設定開始與結束時間）") }}</span></li>
+    <li>{{ mark(n_accounts > 0) }} <a href="/admin/accounts">{{ _("帳號") }}</a>{{ _("：批次產生或匯入 CSV，列印發給作答者") }}
+      <span class="muted">{{ _("（目前 {n} 個帳號，已綁定編號 {bound} 個）", n=n_accounts, bound=n_bound) }}</span></li>
+    <li>{{ mark(n_bound > 0) }} {{ _("用另一個瀏覽器（或無痕視窗）以作答者身分登入，綁定編號後開題試做") }}</li>
+    <li>{{ mark(false) }} {{ _("回到這裡看成績、出席與運作中的環境") }}</li>
+  </ol>
+  <div class="actions">
+    <a class="btn primary" href="/admin/sets">{{ _("建立題組") }}</a>
+    <a class="btn" href="/admin/questions">{{ _("題庫") }}</a>
+    <a class="btn" href="/admin/accounts">{{ _("帳號") }}</a>
+  </div>
+  <p class="muted">{{ _("完整說明見管理者操作手冊（docs/ADMIN.md）。") }}</p>
+</div>
+{% endblock %}

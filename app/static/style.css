@@ -112,3 +112,7 @@ body.term-only .lsa-term { height: 100vh; }
 .attempt-box .countdown.urgent { color: var(--bad); }
 .popped .primary { font-size: 16px; padding: 10px 22px; }
 .lsa-term .bar .bad { color: #ff7b72; font-weight: 600; }
+
+/* 開始使用的步驟 */
+.steps { line-height: 2; padding-left: 22px; }
+.steps b { display: inline-block; width: 1.2em; }

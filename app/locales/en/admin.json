@@ -314,5 +314,17 @@
  "（測驗題組需要設定開始與結束時間，作答者才能作答）": " (assessment sets need start and end times before participants can answer)",
  "測驗進行中暫停": "Paused during assessment",
  "測驗結束": "Assessment ended",
- "欄位依序：帳號, 密碼, 編號, 備註（只有帳號必填）。密碼留空會隨機產生；有填編號則直接綁定；第一列若是標題會略過。": "Columns in order: username, password, ID, note (only username is required). Empty passwords are generated randomly; rows with an ID are bound immediately; a header row is skipped."
+ "欄位依序：帳號, 密碼, 編號, 備註（只有帳號必填）。密碼留空會隨機產生；有填編號則直接綁定；第一列若是標題會略過。": "Columns in order: username, password, ID, note (only username is required). Empty passwords are generated randomly; rows with an ID are bound immediately; a header row is skipped.",
+ "開始使用": "Getting started",
+ "還沒有任何題組。成績總覽會顯示題組的成績，請依下列步驟建立第一個題組：": "There are no question sets yet. The overview shows the scores of a set — follow these steps to create your first one:",
+ "：每一題按「建置範本＋自我測試」": ": press \"Build template + self-test\" for each question",
+ "（已建置 {ready} / {total} 題）": "({ready} / {total} questions built)",
+ "：新增題組、放入題目，並勾選「作答者可見」": ": create a set, add questions and check \"Visible to participants\"",
+ "（練習可以不設時間；測驗要設定開始與結束時間）": "(practice sets may have no times; assessment sets need a start and end time)",
+ "：批次產生或匯入 CSV，列印發給作答者": ": generate accounts or import a CSV, then print them for participants",
+ "（目前 {n} 個帳號，已綁定編號 {bound} 個）": "({n} accounts, {bound} bound to an ID)",
+ "用另一個瀏覽器（或無痕視窗）以作答者身分登入，綁定編號後開題試做": "Log in as a participant in another browser (or a private window), bind an ID and try a question",
+ "回到這裡看成績、出席與運作中的環境": "Come back here to see scores, attendance and running environments",
+ "建立題組": "Create a question set",
+ "完整說明見管理者操作手冊（docs/ADMIN.md）。": "See the administrator guide (docs/ADMIN.md) for details."
 }

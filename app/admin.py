@@ -117,8 +117,13 @@ def _score_matrix(st: dict):
 async def overview(request: Request):
     require_admin(request)
     st = _pick_set(request)
-    if st is None:
-        return _back("/admin/sets", _("請先建立題組"))
+    if st is None:   # 還沒有任何題組（例如剛安裝好）：顯示開始使用的步驟
+        qs, _bad = questions.load_all()
+        ready = {r["qid"]: r for r in db.query("SELECT qid, selftest_json FROM templates WHERE status='ready'")}
+        return _render(request, "admin/getting_started.html", {
+            "n_questions": len(qs), "n_ready": sum(1 for q in qs if q in ready),
+            "n_accounts": db.one("SELECT COUNT(*) n FROM accounts")["n"],
+            "n_bound": db.one("SELECT COUNT(*) n FROM accounts WHERE participant_code IS NOT NULL")["n"]})
     qs, rows, total = _score_matrix(st)
     counts = {r["status"]: r["n"] for r in db.query(
         "SELECT status, COUNT(*) n FROM instances WHERE set_id=? GROUP BY status", (st["id"],))}

@@ -66,6 +66,20 @@ def test_admin_requires_login(server):
                          allow_redirects=False).status_code != 303
 
 
+def test_overview_getting_started_before_any_set(admin):
+    """還沒有題組時，成績總覽顯示「開始使用」步驟（不跳到題組頁）。必須在其他測試建立題組之前執行。"""
+    r = admin.get("/admin", allow_redirects=False)
+    assert r.status_code == 200
+    assert "開始使用" in r.text and "已建置 2 / 2 題" in r.text and 'href="/admin/sets"' in r.text
+    admin.s.cookies.set("lang", "en")
+    try:
+        r = admin.get("/admin")
+        assert "Getting started" in r.text and "(2 / 2 questions built)" in r.text
+        assert not CJK.findall(visible_text(r.text))
+    finally:
+        admin.s.cookies.set("lang", "zh-TW")
+
+
 def test_admin_pages_render(admin):
     sid = admin.create_set("Pages", "practice")
     admin.add_question(sid, Q)
