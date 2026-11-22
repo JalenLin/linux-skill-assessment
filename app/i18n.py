@@ -26,6 +26,22 @@ _names: dict[str, str] = {DEFAULT: "繁體中文"}
 _patterns: dict[str, list[tuple[re.Pattern, str]]] = {}
 
 
+def normalize_code(code: str) -> str:
+    """語言代碼統一成 BCP 47 寫法：zh_TW、zh-tw、ZH_tw → zh-TW；en → en；zh_Hant_TW → zh-Hant-TW"""
+    parts = [p for p in re.split(r"[-_]", str(code).strip()) if p]
+    if not parts:
+        return ""
+    out = [parts[0].lower()]
+    for p in parts[1:]:
+        if len(p) == 2 or p.isdigit():
+            out.append(p.upper())          # 地區：TW、US、419
+        elif len(p) == 4:
+            out.append(p.title())          # 文字：Hant
+        else:
+            out.append(p.lower())
+    return "-".join(out)
+
+
 def load() -> None:
     _catalogs.clear()
     _patterns.clear()
@@ -34,6 +50,7 @@ def load() -> None:
     for d in sorted(LOCALES.iterdir()):
         if not d.is_dir():
             continue
+        code = normalize_code(d.name)
         cat: dict[str, str] = {}
         for f in sorted(d.glob("*.json")):
             try:
@@ -42,10 +59,10 @@ def load() -> None:
                 log.error("翻譯檔格式錯誤 %s: %s", f, e)
                 continue
             if "_name" in data:
-                _names[d.name] = str(data.pop("_name"))
+                _names[code] = str(data.pop("_name"))
             cat.update({k: v for k, v in data.items() if not k.startswith("_") and v})
-        _catalogs[d.name] = cat
-        _names.setdefault(d.name, d.name)
+        _catalogs[code] = cat
+        _names.setdefault(code, code)
         # 帶參數的字串：給 translate_stored 比對已存在資料庫的訊息
         pats = []
         for k, v in cat.items():
@@ -56,7 +73,7 @@ def load() -> None:
                     pats.append((re.compile(f"^{rx}$", re.S), v))
                 except re.error:
                     pass
-        _patterns[d.name] = pats
+        _patterns[code] = pats
 
 
 def languages() -> dict[str, str]:

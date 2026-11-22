@@ -56,6 +56,26 @@ def test_i18n_with_unknown_check(tmp_path):
     assert any("nosuch" in e for e in q.errors)
 
 
+def test_language_code_underscore_accepted(tmp_path):
+    """zh_TW（Linux locale 寫法）與 zh-TW 視為同一語言"""
+    d = _copy(tmp_path)
+    y = (d / "question.yaml").read_text(encoding="utf-8")
+    (d / "question.yaml").write_text(y.replace("  zh-TW:", "  zh_TW:").replace("lang: en ", "lang: EN "), encoding="utf-8")
+    (d / "description.zh-TW.md").rename(d / "description.zh_tw.md")
+    q = questions.load_one(d)
+    assert q.errors == []
+    assert q.languages == ["en", "zh-TW"]
+    assert q.title_in("zh-TW") == "Hello 服務無法啟動（範例題）"
+    assert "範例題" in q.description_html_in("zh-TW")
+
+
+def test_duplicate_description_language(tmp_path):
+    d = _copy(tmp_path)
+    (d / "description.zh_TW.md").write_text("x", encoding="utf-8")
+    q = questions.load_one(d)
+    assert any("重複" in e for e in q.errors)
+
+
 def test_bad_type(tmp_path):
     d = _copy(tmp_path)
     y = (d / "question.yaml").read_text(encoding="utf-8")

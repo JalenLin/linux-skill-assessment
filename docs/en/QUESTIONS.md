@@ -191,7 +191,7 @@ The participant interface can switch languages, and questions can optionally pro
 - `lang:` in `question.yaml`: the language of the main content (`title`, `description.md`, and the `desc` of `checks`); default `zh-TW`
 - Add an `i18n:` block to `question.yaml` to provide the title and check-item descriptions per language code; the keys under `checks` must be `id`s that already exist in `checks:`
 - Save translated descriptions as `description.<language code>.md` (keep commands, paths and code blocks as they are)
-- Language codes must match the UI language codes: `zh-TW`, `en` (`zh` would not be picked up)
+- Language codes must match the UI language codes: `zh-TW`, `en`; `zh_TW` (the Linux locale spelling) and different letter case are accepted and treated as `zh-TW`, but a bare `zh` would not be picked up
 - Missing translations automatically fall back to the main content
 - Changing translations does not require rebuilding the template
 

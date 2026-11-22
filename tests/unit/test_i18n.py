@@ -74,3 +74,12 @@ def test_catalog_placeholders_match():
         if set(re.findall(r"\{(\w+)\}", k)) != set(re.findall(r"\{(\w+)\}", v)):
             bad.append((k, v))
     assert not bad, bad
+
+
+def test_normalize_code():
+    from app.i18n import normalize_code
+    assert normalize_code("zh_TW") == "zh-TW"
+    assert normalize_code("zh-tw") == "zh-TW"
+    assert normalize_code("EN") == "en"
+    assert normalize_code("zh_Hant_TW") == "zh-Hant-TW"
+    assert normalize_code("es-419") == "es-419"

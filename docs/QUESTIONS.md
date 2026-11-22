@@ -191,7 +191,7 @@ LXC 容器是 unprivileged + nesting，可以跑 Docker。
 - `question.yaml` 的 `lang:`：主要內容（`title`、`description.md`、`checks` 的 `desc`）的語言，預設 `zh-TW`
 - `question.yaml` 加 `i18n:` 區塊，依語言代碼提供標題與各檢查項目的說明；`checks` 底下的 key 必須是 `checks:` 裡已有的 `id`
 - 題目敘述另存成 `description.<語言代碼>.md`（指令、路徑、code block 保持原樣）
-- 語言代碼要和介面語言代碼一致：`zh-TW`、`en`（寫 `zh` 不會被採用）
+- 語言代碼要和介面語言代碼一致：`zh-TW`、`en`；`zh_TW`（Linux locale 寫法）、大小寫不同也可以，會自動視為 `zh-TW`，但只寫 `zh` 不會被採用
 - 缺少的翻譯會自動改用主要內容顯示
 - 修改翻譯不需要重新建置範本
 

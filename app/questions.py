@@ -24,6 +24,7 @@ import yaml
 
 from . import db
 from .config import cfg
+from .i18n import normalize_code
 
 QID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,40}$")
 CHECK_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
@@ -126,16 +127,18 @@ def load_one(qdir: Path) -> Question:
         checks.append(Check(cid, str(c.get("desc", cid)), float(c.get("points", 0))))
     if not checks:
         errors.append("沒有定義 checks")
-    main_lang = str(meta.get("lang") or "zh-TW")
+    main_lang = normalize_code(meta.get("lang") or "zh-TW")   # zh_TW 與 zh-TW 都接受
     translations: dict[str, dict] = {}
     for code, tr in (meta.get("i18n") or {}).items():
         if not isinstance(tr, dict):
             errors.append(f"i18n.{code} 格式錯誤")
             continue
-        translations[str(code)] = {"title": str(tr.get("title") or ""),
+        translations[normalize_code(code)] = {"title": str(tr.get("title") or ""),
                                    "checks": {str(k): str(v) for k, v in (tr.get("checks") or {}).items()}}
     for f in qdir.glob("description.*.md"):
-        code = f.name[len("description."):-len(".md")]
+        code = normalize_code(f.name[len("description."):-len(".md")])
+        if "description_md" in translations.get(code, {}):
+            errors.append(f"{f.name}：{code} 的題目敘述重複（zh_TW 與 zh-TW 視為同一語言）")
         translations.setdefault(code, {"title": "", "checks": {}})["description_md"] = f.read_text()
     for code, tr in translations.items():
         for cid in tr["checks"]:
