@@ -162,7 +162,7 @@ The "Instances" page lists all participant environments; you can stop, start, or
 | Auto-pause when idle (minutes) | Environments are paused when no terminal has been connected for longer than this |
 | System-wide instance limit | Checked when prewarming instances, to avoid exceeding what the storage can hold |
 | Default language | Traditional Chinese / English / Follow browser language; participants and administrators can each switch on their own |
-| ID format | Regular expression checked when binding an ID |
+| ID format | Regular expression checked when binding an ID or importing CSV (default `^[A-Za-z0-9]{4,20}$`; remember the `^` and `$` anchors). Whatever the format, IDs may only contain letters, digits, `_` `.` `-` and must not start with `.` |
 
 ## What participants see
 

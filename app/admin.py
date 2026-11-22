@@ -591,7 +591,7 @@ async def accounts_import(request: Request, file: UploadFile = File(...)):
         if not u or db.one("SELECT 1 FROM accounts WHERE username=?", (u,)):
             skipped.append(_("第 {n} 列（帳號已存在或空白）", n=n))
             continue
-        # 編號會用在終端機紀錄的資料夾名稱：一律檢查格式，不能有 / 等字元
+        # 除了設定的格式，一律只允許字母、數字、_ . -（避免空白、逗號等字元在 CSV 匯出、網址中出問題）
         if sid and (not re.match(pat, sid) or not re.fullmatch(r"[\w.-]+", sid) or sid.startswith(".")):
             skipped.append(_("第 {n} 列（編號格式不符：{sid}）", n=n, sid=sid))
             continue

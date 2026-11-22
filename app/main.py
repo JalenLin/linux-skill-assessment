@@ -200,7 +200,7 @@ async def bind(request: Request, participant_code: str = Form(...), participant_
     if sid != participant_code2.strip():
         err = _("兩次輸入的編號不一致")
     elif (not re.match(db.get_setting("code_pattern"), sid)
-          or not re.fullmatch(r"[\w.-]+", sid) or sid.startswith(".")):   # 編號也是終端機紀錄的資料夾名稱
+          or not re.fullmatch(r"[\w.-]+", sid) or sid.startswith(".")):   # 一律只允許字母、數字、_ . -（見 admin.py 匯入）
         err = _("編號格式不正確")
     elif db.one("SELECT id FROM accounts WHERE participant_code=?", (sid,)):
         err = _("此編號已被其他帳號使用，請洽管理者")
