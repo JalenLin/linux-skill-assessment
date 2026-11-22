@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block right %}{{ _("編號") }} {{ acc.participant_code }} · <a href="/logout">{{ _("登出") }}</a>{% endblock %}
+{% block content %}
+{% set g = settings() %}
+{% if g.notice %}<div class="card">{{ g.notice | e | replace('\n', '<br>') | safe }}</div>{% endif %}
+<div class="card">
+  <h2>{{ _("題組列表") }}</h2>
+  <div class="qlist">
+  {% for it in items %}
+    <a class="qcard" href="/s/{{ it.s.id }}">
+      <span><span class="tag {{ 'building' if it.s.mode == 'assessment' else 'running' }}">{{ _(MODES[it.s.mode]) }}</span>
+        <span class="tag {{ 'running' if it.state == 'open' }}">{{ _(STATE_LABEL[it.state]) }}</span></span>
+      <span class="qtitle">{{ it.s.name }}</span>
+      <span class="muted" style="font-size:13px">{{ _("{n} 題", n=it.n) }}
+        {% if it.start or it.end %}·
+          {{ it.start.strftime('%m/%d %H:%M') if it.start else _("即日起") }} {{ _("～") }} {{ it.end.strftime('%m/%d %H:%M') if it.end else _("不限") }}
+        {% else %}· {{ _("隨時可練習") }}{% endif %}</span>
+      {% if it.total %}<span class="score">{{ '%g' % it.got }} <span class="muted" style="font-size:14px">/ {{ '%g' % it.total }}</span></span>{% endif %}
+    </a>
+  {% else %}
+    <p class="muted">{{ _("目前沒有開放的題組。") }}</p>
+  {% endfor %}
+  </div>
+</div>
+{% endblock %}

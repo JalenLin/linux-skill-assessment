@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="{{ lang() }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ tr_stored(settings().site_title) }}{% endblock %}</title>
+<link rel="stylesheet" href="/static/style.css">
+{% block head %}{% endblock %}
+</head>
+<body class="{% block bodyclass %}{% endblock %}">
+{% block header %}
+<header class="top">
+  <span class="title">{{ tr_stored(settings().site_title) }}</span>
+  <nav>{% block nav %}{% endblock %}</nav>
+  <span class="right">{% block right %}{% endblock %}
+    {% set langs = languages() %}{% if langs|length > 1 %}<span class="langs">{% for code, name in langs.items() %}{% if code != lang() %} · <a href="/lang/{{ code }}?next={{ request.url.path | urlencode }}{{ ('%3F' ~ (request.url.query | urlencode)) if request.url.query }}">{{ name }}</a>{% endif %}{% endfor %}</span>{% endif %}</span>
+</header>
+{% endblock %}
+{% block body %}
+<main class="{% block mainclass %}{% endblock %}">
+  {% if msg %}<div class="msg">{{ msg }}</div>{% endif %}
+  {% block content %}{% endblock %}
+</main>
+{% endblock %}
+<script>window.I18N = {{ i18n_catalog() | tojson }}; window.t = function (s, v) { var r = window.I18N[s] || s; if (v) for (var k in v) r = r.split("{" + k + "}").join(v[k]); return r; };</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,53 @@
+{% extends "admin/base.html" %}
+{% block mainclass %}wide{% endblock %}
+{% block admin %}
+<div class="card">
+  <div class="actions" style="margin-top:0">
+    {% for x in all_sets %}<a class="btn {{ 'primary' if x.id == st.id }}" href="/admin?set={{ x.id }}">{{ _(MODES[x.mode]) }}{{ _("：") }}{{ x.name }}</a>{% endfor %}
+  </div>
+  <h2>{{ st.name }} <span class="tag {{ 'running' if state == 'open' }}">{{ _(STATE_LABEL[state]) }}</span>
+    {% if not st.visible %}<span class="tag">{{ _("作答者看不到") }}</span>{% endif %}
+    <a style="font-size:14px;font-weight:normal" href="/admin/sets/{{ st.id }}">{{ _("題組設定") }}</a></h2>
+  <p>{{ _("時間：{start} ～ {end}", start=(start.strftime('%Y-%m-%d %H:%M') if start else (_("即日起") if st.mode == 'practice' else _("未設定"))), end=(end.strftime('%Y-%m-%d %H:%M') if end else (_("不限") if st.mode == 'practice' else _("未設定")))) }}
+     · {{ _("已綁定編號 {n} / {total} 帳號", n=bound, total=rows|length) }} · {{ _("出席 {n}", n=present) }}
+     · {{ _("實例：運作中 {running}、停止 {stopped}", running=counts.get('running', 0), stopped=counts.get('stopped', 0)) }}{% if counts.get('creating') %}{{ _("、建立中 {n}", n=counts.creating) }}{% endif %}
+     · {{ _("檢查佇列 {n}", n=queue) }}</p>
+  <div class="actions">
+    {% if state == 'open' and end %}
+      <form class="inline" method="post" action="/admin/sets/{{ st.id }}/extend">
+        <input type="hidden" name="minutes" value="10"><button>{{ _("延長 10 分鐘") }}</button></form>
+    {% endif %}
+    {% if st.mode == 'assessment' %}
+    <form class="inline" method="post" action="/admin/sets/{{ st.id }}/final"
+          onsubmit='return confirm({{ _("對本題組所有作答者的實例執行最終校驗？") | tojson }})'>
+      <button class="primary" {% if state == 'open' %}disabled title="{{ _("測驗結束後才能執行") }}"{% endif %}>{{ _("最終校驗（全部）") }}</button></form>
+    {% endif %}
+    <a class="btn" href="/admin/scores.csv?set={{ st.id }}">{{ _("匯出成績 CSV") }}</a>
+    <a class="btn" href="/admin?set={{ st.id }}">{{ _("重新整理") }}</a>
+  </div>
+</div>
+
+<div class="card" style="overflow:auto">
+  <h2>{{ _("成績矩陣") }} <span class="muted" style="font-size:14px;font-weight:normal">{{ _("（滿分 {total}；— 表示未檢查；括號為環境狀態）", total='%g' % total) }}</span></h2>
+  <table class="matrix">
+    <tr><th>{{ _("編號 / 帳號") }}</th><th title="{{ _("開放時間內第一次進入題組／開題／按檢查的時間") }}">{{ _("出席") }}</th>
+      {% for q in qs %}<th title="{{ q.title_in() }}">{{ loop.index }}. {{ q.qid }}</th>{% endfor %}
+      <th>{{ _("總分") }}</th></tr>
+    {% for r in rows %}
+    <tr>
+      <td><a href="/admin/participant/{{ r.acc.id }}">{{ r.acc.participant_code or _("（未綁定）") }}</a>
+          <span class="muted">{{ r.acc.username }}</span></td>
+      <td>{% if r.att %}{{ r.att.first[11:16] }}{% if r.att.late %} <span class="{{ 'bad' if r.att.late >= 15 else 'muted' }}">{{ _("晚 {n} 分", n=r.att.late) }}</span>{% endif %}
+            <span class="muted" title="{{ _("IP（多個 IP 可能是換電腦或代登）") }}">{{ r.att.ip or '' }}{% if r.att.n_ip > 1 %} <b class="warn">+{{ r.att.n_ip - 1 }}</b>{% endif %}</span>
+          {% elif r.acc.participant_code %}<span class="bad">{{ _("缺") }}</span>{% endif %}</td>
+      {% for c in r.cells %}
+        {% set cls = '' if c.score is none else ('full' if c.score >= c.total else ('part' if c.score > 0 else 'zero')) %}
+        <td class="{{ cls }}">{{ '—' if c.score is none else '%g' % c.score }}
+          {% if c.inst == 'running' %}<span class="ok" title="{{ _("運作中") }}">●</span>{% elif c.inst %}<span class="muted" title="{{ c.inst }}">○</span>{% endif %}</td>
+      {% endfor %}
+      <td class="num"><b>{{ '%g' % r.got }}</b></td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

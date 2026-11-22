@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block header %}{% endblock %}
+{% block content %}
+<p class="noprint"><button onclick="print()">{{ _("列印") }}</button> <span class="muted">{{ _("只列出尚未綁定編號的帳號") }}</span></p>
+<div class="print-grid">
+{% for a in accs %}
+  <div><b>{{ tr_stored(settings().site_title) }}</b><br>
+    {{ _("網址：") }}<code id="u{{ loop.index }}"></code><br>
+    {{ _("帳號：") }}<code>{{ a.username }}</code><br>
+    {{ _("密碼：") }}<code>{{ a.init_password }}</code></div>
+{% endfor %}
+</div>
+<script>document.querySelectorAll('[id^=u]').forEach(e => e.textContent = location.origin);</script>
+{% endblock %}

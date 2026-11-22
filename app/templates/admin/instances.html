@@ -1,0 +1,33 @@
+{% extends "admin/base.html" %}
+{% block admin %}
+<div class="card">
+  <h2>{{ _("批次操作") }}</h2>
+  <div class="actions">
+    <form class="inline" method="post" action="/admin/instances/stop_all" onsubmit='return confirm({{ _("停止全部實例？") | tojson }})'>
+      <button>{{ _("停止全部") }}</button></form>
+    <form class="inline" method="post" action="/admin/instances/destroy_all" onsubmit='return confirm({{ _("真的要刪除所有作答者的實例？作答內容會消失！") | tojson }})'>
+      <input type="text" name="confirm" placeholder="{{ _("輸入 DELETE") }}" style="width:120px">
+      <button class="danger">{{ _("刪除全部實例") }}</button></form>
+  </div>
+  <p class="muted">{{ _("PVE 從同一範本 clone 會排隊（每個約 7 秒），60 人同時開題最慢要等數分鐘。") }}
+    {{ _("建議測驗前（可前一天）到「題組」頁該測驗按「預先建立實例」，測驗開始時作答者只需要啟動（約 4 秒）。") }}
+    {{ _("練習與測驗的環境是分開的；練習用完可在題組頁「刪除此題組所有實例」釋放空間。") }}</p>
+</div>
+<div class="card">
+  <h2>{{ _("實例（{n}）", n=rows|length) }}</h2>
+  <table>
+    <tr><th>{{ _("編號") }}</th><th>{{ _("題組") }}</th><th>{{ _("題目") }}</th><th>VMID</th><th>IP</th><th>{{ _("狀態") }}</th><th>Shell</th><th>{{ _("建立時間") }}</th><th>{{ _("最後使用") }}</th><th></th></tr>
+    {% for r in rows %}
+    <tr><td><a href="/admin/participant/{{ r.account_id }}">{{ r.participant_code or r.username }}</a></td>
+      <td>{{ r.set_name or '#%s' % r.set_id }}</td><td>{{ r.qid }}</td>
+      <td>{{ r.vmid }}</td><td>{{ r.ip }}</td><td><span class="tag {{ r.status }}">{{ r.status }}</span></td>
+      <td>{{ r.shells or '' }}</td><td class="muted">{{ r.created_at }}</td><td class="muted">{{ r.last_access }}</td>
+      <td>
+        {% if r.status == 'running' %}<form class="inline" method="post" action="/admin/instances/{{ r.id }}/stop"><button class="link">{{ _("停止") }}</button></form>
+        {% else %}<form class="inline" method="post" action="/admin/instances/{{ r.id }}/start"><button class="link">{{ _("啟動") }}</button></form>{% endif %} ·
+        <form class="inline" method="post" action="/admin/instances/{{ r.id }}/destroy" onsubmit='return confirm({{ _("刪除此實例（等同作答者重置）？") | tojson }})'><button class="link bad">{{ _("刪除") }}</button></form>
+      </td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

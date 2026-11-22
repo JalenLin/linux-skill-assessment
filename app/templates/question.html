@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ q.title_in() }} - {{ tr_stored(settings().site_title) }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/vendor/xterm.css">{% endblock %}
+{% block bodyclass %}work{% endblock %}
+{% block nav %}<a href="{{ sbase }}">← {{ s.name }}</a>{% endblock %}
+{% block right %}
+  {% if s.mode == 'practice' %}<span class="tag running">{{ _("練習") }}</span> ·{% endif %}
+  {% if seconds_left is not none %}{{ _("剩餘") }} <span class="countdown" id="countdown" data-left="{{ seconds_left }}" data-home="{{ sbase }}">--:--:--</span> ·{% endif %}
+  {{ _("編號") }} {{ acc.participant_code }}
+{% endblock %}
+{% block body %}
+<div class="work-wrap" id="wrap">
+  <section class="work-side">
+    <h1>{{ q.title_in() }}</h1>
+    {% if lang() not in q.languages %}<p class="muted" style="font-size:13px">{{ _("（本題尚無此語言版本，顯示原文）") }}</p>{% endif %}
+    <div class="desc">{{ q.description_html_in() | safe }}</div>
+
+    <div class="card" style="padding:12px 14px">
+      {% if timing.timed %}
+      <div class="attempt-box" id="attempt-box">⏱ {{ _("本題限時 {n} 分鐘", n=timing.limit_min) }}
+        {% if timing.max_attempts %}{{ _("，可作答 {max} 次（已用 {used} 次）", max=timing.max_attempts, used=timing.used) }}{% endif %}
+        <div id="attempt-active" {% if not timing.active %}hidden{% endif %}>{{ _("本次作答剩餘") }} <b class="countdown" id="attempt-left">--:--</b></div>
+        <div class="muted" style="font-size:13px">{{ _("時間到、改開別題、或關閉本頁超過 1 分鐘，都會中斷並重置環境。") }}
+          {{ _("請在時間內按「檢查作答」，成績取時間內檢查的最高分。") }}</div>
+      </div>
+      {% endif %}
+      <div>{{ _("本題得分：") }}<b id="qscore">{% if score is none %}—{% else %}{{ '%g' % score }}{% endif %}</b> / {{ '%g' % total }}
+        <span class="muted" id="policy"></span></div>
+      <div class="actions">
+        <button class="primary" id="btn-check" disabled>{{ _("檢查作答") }}</button>
+        <button id="btn-reconnect" disabled>{{ _("重新連線終端機") }}</button>
+        <button class="danger" id="btn-reset" disabled>{{ _("重置本題環境") }}</button>
+      </div>
+      <div id="check-msg" class="muted"></div>
+    </div>
+
+    <div class="runs" id="runs"></div>
+  </section>
+
+  <div class="splitter" id="splitter" title="{{ _("拖曳調整寬度，雙擊恢復預設") }}"></div>
+
+  <section class="lsa-term">
+    <div class="bar"><span class="dot" id="dot"></span><span id="term-status">{{ _("準備環境中…") }}</span>
+      <span class="spacer"></span>
+      <button class="bar-btn" id="btn-popout" title="{{ _("把終端機移到新視窗（可放到另一個螢幕）") }}">{{ _("在新視窗開啟") }}</button>
+    </div>
+    <div id="term"></div>
+    <div id="start-panel" class="popped" hidden>
+      <p id="start-info"></p>
+      <p><button class="primary" id="btn-begin">{{ _("開始作答") }}</button></p>
+      <p class="muted" id="start-reason"></p>
+    </div>
+    <div id="popped" class="popped" hidden>
+      <p>{{ _("終端機已在新視窗開啟。") }}</p>
+      <p><button id="btn-focus-pop">{{ _("切換到終端機視窗") }}</button>
+         <button id="btn-pull-back">{{ _("移回這個頁面") }}</button></p>
+    </div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/vendor/xterm.js"></script>
+<script src="/static/vendor/addon-fit.js"></script>
+<script>window.QID = {{ q.qid | tojson }}; window.SID = {{ s.id }}; window.TIMING = {{ timing | tojson }}; window.BLOCK_PASTE = {{ s.block_paste | tojson }};</script>
+<script src="/static/app.js"></script>
+<script src="/static/question.js"></script>
+{% endblock %}

@@ -1,0 +1,42 @@
+# 校驗：作答者按「檢查作答」時執行（考後最終校驗也是這份）。
+# - task 名稱以 "check:<id>" 開頭，對應 question.yaml 的 checks；同一個 id 的 task 全部成功才得分
+# - 變數 target_ip = 作答者環境的 IP
+# - 作答者在環境裡有 root，能改掉 curl、systemctl；能從外部驗證的就 delegate_to: localhost（在評分主機執行）
+- hosts: target
+  gather_facts: false
+  ignore_errors: true          # 必要：某項失敗後繼續檢查其他項
+  tasks:
+    - name: "check:page 從評分主機瀏覽網頁"
+      ansible.builtin.uri:
+        url: "http://{{ target_ip }}:8000/"
+        return_content: true
+        timeout: 5
+      register: page
+      failed_when: page.status != 200 or 'Hello Lab' not in page.content
+      delegate_to: localhost
+
+    - name: "check:boot 開機自動啟動"
+      ansible.builtin.command: systemctl is-enabled hello
+      changed_when: false
+
+    # 「重新啟動後仍正常」：在檢查裡實際重啟一次再驗證
+    - name: "check:restart 重新啟動服務"
+      ansible.builtin.systemd_service:
+        name: hello
+        state: restarted
+
+    - name: "check:restart 等服務開好"
+      ansible.builtin.wait_for:
+        host: "{{ target_ip }}"
+        port: 8000
+        timeout: 10
+      delegate_to: localhost
+
+    - name: "check:restart 重啟後再瀏覽一次"
+      ansible.builtin.uri:
+        url: "http://{{ target_ip }}:8000/"
+        return_content: true
+        timeout: 5
+      register: page2
+      failed_when: page2.status != 200 or 'Hello Lab' not in page2.content
+      delegate_to: localhost

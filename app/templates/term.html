@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ _("終端機") }} - {{ q.title_in() }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/vendor/xterm.css">{% endblock %}
+{% block bodyclass %}work term-only{% endblock %}
+{% block header %}{% endblock %}
+{% block body %}
+<section class="lsa-term">
+  <div class="bar"><span class="dot" id="dot"></span><b>{{ q.title_in() }}</b><span id="term-status">{{ _("準備環境中…") }}</span>
+    <span class="spacer"></span>
+    {% if timing.timed %}{{ _("本題剩餘") }} <span class="countdown" id="attempt-left">--:--</span> ·{% endif %}
+    {% if seconds_left is not none %}{{ _("開放剩餘") if s.mode == 'practice' else _("測驗剩餘") }} <span class="countdown" id="countdown" data-left="{{ seconds_left }}" data-home="{{ sbase }}">--:--:--</span>{% endif %}
+    <button class="bar-btn" id="btn-reconnect">{{ _("重新連線") }}</button>
+  </div>
+  <div id="term"></div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/vendor/xterm.js"></script>
+<script src="/static/vendor/addon-fit.js"></script>
+<script>window.QID = {{ q.qid | tojson }}; window.TERM_ONLY = true; window.SID = {{ s.id }}; window.TIMING = {{ timing | tojson }}; window.BLOCK_PASTE = {{ s.block_paste | tojson }};</script>
+<script src="/static/app.js"></script>
+<script src="/static/question.js"></script>
+{% endblock %}

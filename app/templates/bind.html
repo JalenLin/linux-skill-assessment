@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block right %}{{ acc.username }} · <a href="/logout">{{ _("登出") }}</a>{% endblock %}
+{% block content %}
+<div class="card narrow">
+  <h2>{{ _("輸入編號") }}</h2>
+  <p>{{ _("帳號 {u} 第一次使用，請輸入你的編號（例如學號、員工編號，或主辦單位指定的編號）。", u=acc.username) }}<br>
+     <span class="bad">{{ _("綁定後無法自行修改，打錯請找管理者。") }}</span></p>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  <form method="post" action="/bind">
+    <label>{{ _("編號") }}</label><input type="text" name="participant_code" required autofocus autocomplete="off">
+    <label>{{ _("再輸入一次編號") }}</label><input type="text" name="participant_code2" required autocomplete="off">
+    <p><button class="primary" type="submit">{{ _("確認綁定") }}</button></p>
+  </form>
+</div>
+{% endblock %}

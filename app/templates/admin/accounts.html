@@ -1,0 +1,43 @@
+{% extends "admin/base.html" %}
+{% block admin %}
+<div class="grid2">
+  <div class="card">
+    <h2>{{ _("批次產生帳號") }}</h2>
+    <form method="post" action="/admin/accounts/generate" class="grid2">
+      <div><label>{{ _("前綴") }}</label><input type="text" name="prefix" value="assessment"></div>
+      <div><label>{{ _("數量") }}</label><input type="number" name="count" value="60" min="1" max="500"></div>
+      <div><label>{{ _("起始編號") }}</label><input type="number" name="start" value="1" min="0"></div>
+      <div style="align-self:end"><button class="primary">{{ _("產生") }}</button></div>
+    </form>
+    <p class="muted">{{ _("帳號例如 p001，密碼隨機 8 碼。") }}</p>
+  </div>
+  <div class="card">
+    <h2>{{ _("匯入 CSV") }}</h2>
+    <form method="post" action="/admin/accounts/import" enctype="multipart/form-data" class="actions">
+      <input type="file" name="file" accept=".csv" required><button class="primary">{{ _("匯入") }}</button>
+    </form>
+    <p class="muted">{{ _("欄位依序：帳號, 密碼, 編號, 備註（只有帳號必填）。密碼留空會隨機產生；有填編號則直接綁定；第一列若是標題會略過。") }}</p>
+  </div>
+</div>
+<div class="card">
+  <h2>{{ _("帳號列表（{n}）", n=accs|length) }}
+    <span style="float:right;font-size:14px;font-weight:normal">
+      <a class="btn" href="/admin/accounts.csv">{{ _("匯出 CSV") }}</a>
+      <a class="btn" href="/admin/accounts/print" target="_blank">{{ _("列印帳密紙條") }}</a></span></h2>
+  <table>
+    <tr><th>{{ _("帳號") }}</th><th>{{ _("初始密碼") }}</th><th>{{ _("編號") }}</th><th>{{ _("綁定時間") }}</th><th>{{ _("備註") }}</th><th></th></tr>
+    {% for a in accs %}
+    <tr>
+      <td>{{ a.username }}</td><td><code>{{ a.init_password or '' }}</code></td>
+      <td>{% if a.participant_code %}<a href="/admin/participant/{{ a.id }}">{{ a.participant_code }}</a>{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td class="muted">{{ a.bound_at or '' }}</td><td>{{ a.note or '' }}</td>
+      <td>
+        {% if a.participant_code %}<form class="inline" method="post" action="/admin/accounts/{{ a.id }}/unbind" onsubmit='return confirm({{ _("解除 {u} 的編號綁定？", u=a.username) | tojson }})'><button class="link">{{ _("解除綁定") }}</button></form> · {% endif %}
+        <form class="inline" method="post" action="/admin/accounts/{{ a.id }}/resetpw" onsubmit='return confirm({{ _("重設密碼？") | tojson }})'><button class="link">{{ _("重設密碼") }}</button></form> ·
+        <form class="inline" method="post" action="/admin/accounts/{{ a.id }}/delete" onsubmit='return confirm({{ _("刪除帳號 {u} 與其檢查紀錄？", u=a.username) | tojson }})'><button class="link bad">{{ _("刪除") }}</button></form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

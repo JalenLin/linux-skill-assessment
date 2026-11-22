@@ -1,0 +1,27 @@
+{% extends "admin/base.html" %}
+{% block admin %}
+<form method="post" action="/admin/settings">
+<div class="card">
+  <h2>{{ _("系統設定") }}</h2>
+  <p class="muted">{{ _("測驗/練習的時間、計分方式、禁止貼上等，改到「題組」頁分別設定。") }}</p>
+  <label>{{ _("網站標題") }}</label><input type="text" name="site_title" value="{{ s.site_title }}">
+  <label>{{ _("首頁公告（作答者登入後所有頁面上方看到）") }}</label>
+  <textarea name="notice" rows="3">{{ s.notice }}</textarea>
+  <div class="grid2">
+    <div><label>{{ _("每位作答者同時運作的環境數上限") }}</label><input type="number" name="max_running" value="{{ s.max_running }}" min="1">
+      <p class="muted">{{ _("開新題目超過上限時，最久沒用的環境會被暫停（內容保留）。跨題組計算。") }}</p></div>
+    <div><label>{{ _("無連線自動暫停（分鐘）") }}</label><input type="number" name="idle_stop_min" value="{{ s.idle_stop_min }}" min="1"></div>
+    <div><label>{{ _("全系統實例總數上限") }}</label><input type="number" name="max_instances" value="{{ s.max_instances }}" min="1">
+      <p class="muted">{{ _("預先建立時檢查。每個實例佔一個 LVM 磁碟，PVE 預設的 LVM metadata 約可容納 1100 個磁碟。") }}</p></div>
+    <div><label>{{ _("預設語言") }}</label>
+      <select name="default_lang">
+        <option value="auto" {{ 'selected' if s.default_lang == 'auto' }}>{{ _("依瀏覽器語言") }}</option>
+        {% for code, name in languages().items() %}<option value="{{ code }}" {{ 'selected' if s.default_lang == code }}>{{ name }}</option>{% endfor %}
+      </select>
+      <p class="muted">{{ _("作答者和管理者都可以在右上角自行切換語言。") }}</p></div>
+    <div><label>{{ _("編號格式（正規表示式）") }}</label><input type="text" name="code_pattern" value="{{ s.code_pattern }}"></div>
+  </div>
+</div>
+<button class="primary" type="submit">{{ _("儲存") }}</button>
+</form>
+{% endblock %}

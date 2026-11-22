@@ -1,0 +1,51 @@
+{% extends "admin/base.html" %}
+{% block admin %}
+<p><a href="/admin">← {{ _("總覽") }}</a></p>
+<div class="card">
+  <h2>{{ acc.participant_code or _("（未綁定）") }} <span class="muted" style="font-size:14px">{{ acc.username }}</span></h2>
+  <h3>{{ _("實例") }}</h3>
+  <table>
+    <tr><th>{{ _("題組") }}</th><th>{{ _("題目") }}</th><th>VMID</th><th>IP</th><th>{{ _("狀態") }}</th><th>{{ _("最後使用") }}</th></tr>
+    {% for i in insts %}<tr><td>{{ i.set_name }}</td><td>{{ i.qid }}</td><td>{{ i.vmid }}</td><td>{{ i.ip }}</td>
+      <td><span class="tag {{ i.status }}">{{ i.status }}</span></td><td class="muted">{{ i.last_access }}</td></tr>
+    {% else %}<tr><td colspan="6" class="muted">{{ _("無") }}</td></tr>{% endfor %}
+  </table>
+  {% if atts %}
+  <h3>{{ _("限時作答紀錄") }}</h3>
+  <table>
+    <tr><th>{{ _("題組") }}</th><th>{{ _("題目") }}</th><th>{{ _("開始") }}</th><th>{{ _("截止") }}</th><th>{{ _("結束") }}</th><th>{{ _("原因") }}</th><th></th></tr>
+    {% for t in atts %}{% set reason = {'timeout':'時間到','set_end':'測驗結束','admin':'管理者結束','left':'離開頁面','switched':'改開別題','closed':'題組關閉'}.get(t.end_reason) %}<tr><td>{{ t.set_name }}</td><td>{{ t.qid }}</td><td class="muted">{{ t.started_at }}</td><td class="muted">{{ t.deadline }}</td>
+      <td class="muted">{{ t.ended_at or _("進行中") }}</td><td>{{ _(reason) if reason else (t.end_reason or '') }}</td>
+      <td>{% if not t.ended_at %}<form class="inline" method="post" action="/admin/participant/{{ acc.id }}/attempts/{{ t.id }}/end" onsubmit='return confirm({{ _("立即結束這次作答並重置環境？") | tojson }})'><button class="link bad">{{ _("立即結束") }}</button></form>
+          {% else %}<form class="inline" method="post" action="/admin/participant/{{ acc.id }}/attempts/{{ t.id }}/clear" onsubmit='return confirm({{ _("清除 {qid} 已結束的作答紀錄，讓作答者可以重新作答？", qid=t.qid) | tojson }})'><button class="link">{{ _("重設此題次數") }}</button></form>{% endif %}</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+  <h3>{{ _("終端機紀錄") }}</h3>
+  <p>{% for l in logs %}<a href="/admin/shell_log/{{ acc.id }}/{{ l }}" target="_blank">{{ l }}</a>　{% else %}<span class="muted">{{ _("無") }}</span>{% endfor %}</p>
+</div>
+<div class="card">
+  <h2>{{ _("活動紀錄") }} <span class="muted" style="font-size:14px;font-weight:normal">{{ _("最近 200 筆（出席依據）") }}</span></h2>
+  <details><summary class="muted">{{ _("{n} 筆，點開查看", n=acts|length) }}</summary>
+  <table>
+    <tr><th>{{ _("時間") }}</th><th>{{ _("動作") }}</th><th>{{ _("題組") }}</th><th>{{ _("題目") }}</th><th>IP</th></tr>
+    {% for x in acts %}{% set kind = {'login':'登入','view':'進入題組','start':'開題','shell':'連終端機'}.get(x.kind) %}<tr><td class="muted">{{ x.at }}</td>
+      <td>{{ _(kind) if kind else x.kind }}</td>
+      <td>{{ x.set_name }}</td><td>{{ x.qid or '' }}</td><td>{{ x.ip or '' }}</td></tr>
+    {% endfor %}
+  </table></details>
+</div>
+<div class="card">
+  <h2>{{ _("檢查紀錄") }}</h2>
+  <table>
+    <tr><th>#</th><th>{{ _("題組") }}</th><th>{{ _("題目") }}</th><th>{{ _("時間") }}</th><th>{{ _("狀態") }}</th><th class="num">{{ _("得分") }}</th><th>{{ _("訊息") }}</th></tr>
+    {% for r in runs %}
+    <tr><td><a href="/admin/runs/{{ r.id }}" target="_blank">{{ r.id }}</a></td><td>{{ r.set_name }}</td><td>{{ r.qid }}</td>
+      <td class="muted">{{ r.started_at }}</td>
+      <td>{{ r.status }}{% if r.is_final %} <span class="tag running">{{ _("最終") }}</span>{% endif %}</td>
+      <td class="num">{{ '' if r.score is none else '%g' % r.score }}{% if r.max_score %} / {{ '%g' % r.max_score }}{% endif %}</td>
+      <td>{{ tr_stored(r.message) }}</td></tr>
+    {% else %}<tr><td colspan="7" class="muted">{{ _("無") }}</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

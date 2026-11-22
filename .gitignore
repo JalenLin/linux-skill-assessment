@@ -1,0 +1,27 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# 本機資料與設定（含密碼、token）
+data/
+data-dev/
+config.yaml
+config.local.yaml
+deploy/deploy.env
+*.db
+*.db-*
+
+# 舊資料、考卷
+old/
+
+# 題庫另外管理：只保留格式說明與範例題
+questions/*
+!questions/README.md
+!questions/example-hello/
+
+# 編輯器
+.vscode/
+.idea/
+*.swp
+.DS_Store

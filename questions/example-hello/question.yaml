@@ -1,0 +1,28 @@
+# 範例題：示範題目包的所有欄位。複製這個資料夾、改名、改內容，就是你自己的題目。
+# 資料夾名稱 = 題目 id（小寫英數與 -）。
+title: Hello 服務無法啟動（範例題）
+type: lxc            # lxc（容器，預設，省資源）或 vm（需要 kernel 功能：掛磁碟、NFS server、核心模組…）
+hostname: hello      # 作答者看到的主機名稱
+resources:
+  cores: 1
+  memory: 512        # MB；vm 題建議 1024
+lang: zh-TW          # 主要內容（title、description.md、checks 的 desc）的語言；預設 zh-TW
+checks:              # 檢查項目；配分在後台各題組可以另外調整，這裡是預設值
+  - id: page
+    desc: 從其他電腦瀏覽 http://<本機>:8000/ 可看到 Hello Lab
+    points: 6
+  - id: boot
+    desc: hello 服務設為開機自動啟動
+    points: 2
+  - id: restart
+    desc: 重新啟動 hello 服務後網頁仍正常
+    points: 2
+
+# 選用：其他語言的標題與檢查項目說明（題目敘述放在 description.<代碼>.md）
+i18n:
+  en:
+    title: The hello service won't start (example)
+    checks:
+      page: "http://<host>:8000/ can be browsed from another computer and shows Hello Lab"
+      boot: The hello service is enabled to start at boot
+      restart: The page still works after restarting the hello service

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}{{ s.name }} - {{ tr_stored(settings().site_title) }}{% endblock %}
+{% block nav %}{% if n_sets > 1 %}<a href="/">← {{ _("全部題組") }}</a>{% endif %}{% endblock %}
+{% block right %}
+  {% if state == 'open' and seconds_left is not none %}{{ _("剩餘") }} <span class="countdown" id="countdown" data-left="{{ seconds_left }}">--:--:--</span> ·{% endif %}
+  {{ _("編號") }} {{ acc.participant_code }} · <a href="/logout">{{ _("登出") }}</a>
+{% endblock %}
+{% block content %}
+{% set g = settings() %}
+{% if g.notice %}<div class="card">{{ g.notice | e | replace('\n', '<br>') | safe }}</div>{% endif %}
+{% if s.notice %}<div class="card">{{ s.notice | e | replace('\n', '<br>') | safe }}</div>{% endif %}
+{% set practice = s.mode == 'practice' %}
+
+{% if state == 'unset' or state == 'before' %}
+  <div class="card" style="text-align:center;padding:40px">
+    <h2>{{ _("{name} 尚未開始", name=s.name) }}</h2>
+    {% if start %}
+      <p>{{ _("開放時間：") }}{{ start.strftime('%Y-%m-%d %H:%M') }} {{ _("～") }} {{ end.strftime('%m/%d %H:%M') if end else _("不限") }}</p>
+      <p class="countdown" style="font-size:28px" id="tostart" data-left="{{ to_start }}"></p>
+    {% else %}
+      <p class="muted" id="waiting">{{ _("管理者尚未設定測驗時間。") }}</p>
+    {% endif %}
+    <p class="muted">{{ _("時間到後頁面會自動重新整理。") }}</p>
+  </div>
+{% else %}
+  <div class="card">
+    <h2>{{ s.name }} {% if practice %}<span class="tag running">{{ _("練習") }}</span>{% endif %}
+      <span style="float:right;font-weight:normal">{{ _("練習得分") if practice else _("目前得分") }} <b>{{ '%g' % got }}</b> / {{ '%g' % total }}</span></h2>
+    {% if state == 'locked' %}<p class="warn">{{ _("測驗進行中，練習暫停開放，測驗結束後可繼續練習。") }}</p>
+    {% elif state == 'closed' and practice %}<p class="bad">{{ _("本練習已結束開放。") }}</p>
+    {% elif state == 'closed' %}<p class="bad">{{ _("測驗時間已結束，以下為目前成績（最終成績以公告為準）。") }}</p>
+    {% elif practice %}<p class="muted">{{ _("練習不計入測驗成績，可以重複檢查、重置環境多練幾次。") }}{% if s.end_at %} {{ _("開放到 {t}。", t=end.strftime('%m/%d %H:%M')) }}{% endif %}</p>
+    {% else %}<p class="muted">{{ _("點選任一題開始作答，每題是獨立的環境。各題可自行決定順序，可隨時回來檢查。") }}</p>{% endif %}
+    <div class="qlist">
+    {% for r in rows %}
+      <a class="qcard" {% if state == 'open' %}href="{{ sbase }}/q/{{ r.q.qid }}"{% endif %}>
+        <span class="muted">{{ _("第 {n} 題", n=loop.index) }}</span>
+        <span class="qtitle">{{ r.q.title_in() }}</span>
+        <span class="score">{% if r.score is none %}<span class="muted">—</span>{% else %}{{ '%g' % r.score }}{% endif %}
+          <span class="muted" style="font-size:14px">/ {{ '%g' % r.total }}</span></span>
+        {% if r.timing.timed %}<span class="muted" style="font-size:13px">⏱ {{ _("限時 {n} 分", n=r.timing.limit_min) }}
+          {% if r.timing.max_attempts %}· {{ _("已用 {used}/{max} 次", used=r.timing.used, max=r.timing.max_attempts) }}{% endif %}
+          {% if r.timing.active %}· <b class="warn">{{ _("作答中，剩 {n} 分", n=r.timing.seconds_left // 60) }}</b>
+          {% elif not r.timing.can_start %}· <span class="bad">{{ _("次數已用完") }}</span>{% endif %}</span>{% endif %}
+        <span>{% if r.inst_status %}<span class="tag {{ r.inst_status }}">{{ _({'running':'環境運作中','stopped':'環境已暫停','creating':'建立中'}.get(r.inst_status, r.inst_status)) }}</span>
+              {% else %}<span class="tag">{{ _("尚未開啟") }}</span>{% endif %}</span>
+      </a>
+    {% else %}
+      <p class="muted">{{ _("目前沒有開放的題目。") }}</p>
+    {% endfor %}
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
+{% block scripts %}<script src="/static/app.js"></script>{% endblock %}

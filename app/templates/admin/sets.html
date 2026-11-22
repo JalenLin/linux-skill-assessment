@@ -1,0 +1,31 @@
+{% extends "admin/base.html" %}
+{% block admin %}
+<div class="card">
+  <h2>{{ _("題組") }}</h2>
+  <p class="muted">{{ _("每個題組有自己的題目、配分、開放時間與作答規則。作答者的環境與成績分題組記錄：同一題放在練習和測驗裡，是兩個獨立的環境與成績。") }}
+    <b>{{ _("任何一場測驗進行中時，練習題組會自動暫停") }}</b>{{ _("（練習環境停止、終端機斷線），測驗結束後恢復。") }}</p>
+  <table>
+    <tr><th>{{ _("類型") }}</th><th>{{ _("名稱") }}</th><th>{{ _("作答者看到") }}</th><th>{{ _("開放時間") }}</th><th class="num">{{ _("題數") }}</th><th class="num">{{ _("實例") }}</th></tr>
+    {% for it in items %}
+    <tr><td><span class="tag {{ 'building' if it.s.mode == 'assessment' else 'running' }}">{{ _(MODES[it.s.mode]) }}</span></td>
+      <td><a href="/admin/sets/{{ it.s.id }}">{{ it.s.name }}</a></td>
+      <td><span class="tag {{ 'running' if it.participant_state == 'open' }}">{{ _(STATE_LABEL[it.participant_state]) }}</span></td>
+      <td class="muted">{{ it.start.strftime('%Y-%m-%d %H:%M') if it.start else (_("即日起") if it.s.mode == 'practice' else _("未設定")) }}
+        {{ _("～") }} {{ it.end.strftime('%Y-%m-%d %H:%M') if it.end else (_("不限") if it.s.mode == 'practice' else _("未設定")) }}</td>
+      <td class="num">{{ it.n_q }}</td><td class="num">{{ it.n_inst }}</td></tr>
+    {% else %}<tr><td colspan="6" class="muted">{{ _("尚無題組") }}</td></tr>{% endfor %}
+  </table>
+  <p class="{{ 'error' if n_total > limit * 0.8 else 'muted' }}">{{ _("全系統實例：{n} / 上限 {limit}。題組結束、成績確定後，請到題組頁刪除該題組的實例以釋放空間。", n=n_total, limit=limit) }}</p>
+</div>
+<div class="card">
+  <h2>{{ _("新增題組") }}</h2>
+  <form method="post" action="/admin/sets/create" class="actions" style="align-items:center">
+    <input type="text" name="name" placeholder="{{ _("名稱，例如：第 5 週練習") }}" required style="width:240px">
+    <select name="mode"><option value="practice">{{ _("練習") }}</option><option value="assessment">{{ _("測驗") }}</option></select>
+    <select name="copy_from"><option value="">{{ _("空白（自己選題）") }}</option>
+      {% for it in items %}<option value="{{ it.s.id }}">{{ _("複製「{name}」的題目與配分", name=it.s.name) }}</option>{% endfor %}</select>
+    <button class="primary">{{ _("建立") }}</button>
+  </form>
+  <p class="muted">{{ _("新題組預設不公開，設定好題目與時間後再勾選「作答者可見」。練習預設：顯示檢查細項、可貼上、冷卻 10 秒。") }}</p>
+</div>
+{% endblock %}

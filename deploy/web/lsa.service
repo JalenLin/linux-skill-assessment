@@ -1,0 +1,19 @@
+[Unit]
+Description=linux-skill-assessment (lsa) web
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=lsa
+Group=lsa
+WorkingDirectory=/opt/lsa
+Environment=LSA_CONFIG=/etc/lsa/config.yaml
+Environment=LANG=C.UTF-8
+ExecStart=/opt/lsa/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 80 --proxy-headers --log-level info
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+Restart=always
+RestartSec=3
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

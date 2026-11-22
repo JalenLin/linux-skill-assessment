@@ -1,0 +1,23 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Unit + integration tests (mock mode, no PVE)
+        run: python -m pytest -q
+      - name: Shell scripts
+        run: |
+          for f in deploy/*.sh deploy/*/*.sh; do bash -n "$f"; done
+          shellcheck -S error deploy/*.sh deploy/*/*.sh

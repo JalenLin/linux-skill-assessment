@@ -1,0 +1,28 @@
+# lsa-web 的設定檔範例：放在 /etc/lsa/config.yaml（服務以 LSA_CONFIG 指定）。
+# `deploy/pve-setup.sh config` 會自動產生一份（含隨機密碼）並放到 lsa-web，通常不需要手動寫。
+# 未列出的設定都有預設值，完整清單見 app/config.py。
+
+# --- 網站 ---
+secret_key: "請改成很長的隨機字串"      # session 簽章用；改掉會讓所有人登出
+admin_user: admin
+admin_password: "請改成強密碼"          # 後台 /admin 的密碼
+data_dir: /var/lib/lsa/data       # 資料庫 lsa.db、終端機紀錄
+questions_dir: /var/lib/lsa/questions
+timezone: Asia/Taipei
+
+# --- PVE API（pve-setup.sh perms 建立的使用者與 token）---
+pve_host: 192.168.1.10                   # PVE 主機在 vmbr0 的 IP
+pve_node: pve                            # PVE 節點名稱（hostname）
+pve_user: lsa@pve
+pve_token_name: web
+pve_token_value: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"   # /root/lsa/token.json 的 value
+pve_storage: local-lvm                   # 範本與作答者實例放的儲存空間（需支援 linked clone）
+pve_pool: lsa
+
+# --- 評分 ---
+ssh_key: /etc/lsa/grader_key       # 評分程式登入作答者環境用的金鑰
+# grader_concurrency: 8                  # 同時執行的檢查數
+# check_timeout: 180                     # 單次檢查逾時（秒）
+
+# --- 本機開發（不連 PVE，只看畫面）---
+# mock: true

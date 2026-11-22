@@ -1,0 +1,49 @@
+{% extends "admin/base.html" %}
+{% block admin %}
+<div class="card">
+  <h2>{{ _("上傳題目包") }}</h2>
+  <form method="post" action="/admin/questions/upload" enctype="multipart/form-data" class="actions">
+    <input type="file" name="file" accept=".zip" required>
+    <button class="primary">{{ _("上傳 zip") }}</button>
+  </form>
+  <p class="muted">{{ _("zip 內含 question.yaml、description.md、setup.yml、check.yml（選用 solution.yml、files/）。") }}
+    {{ _("上傳相同 id 會覆蓋（舊版備份到 data/question_backups）。格式說明見 questions/README.md。") }}</p>
+</div>
+
+{% for name, err in bad.items() %}
+  <div class="card"><b class="bad">{{ _("{name} 載入失敗", name=name) }}</b>{{ _("：") }}{{ tr_stored(err) }}</div>
+{% endfor %}
+
+{% for it in items %}
+{% set q = it.q %}
+<div class="card">
+  <h2><a href="/admin/questions/{{ q.qid }}">{{ q.title_in() }}</a>
+    <span class="muted" style="font-size:14px;font-weight:normal">{{ q.qid }} · {{ 'LXC' if q.kind == 'lxc' else 'VM' }}
+      · {{ q.resources.cores }}C/{{ q.resources.memory }}MB · {{ _("作答者實例 {n}", n=it.n_inst) }}</span></h2>
+  {% for e in q.errors %}<div class="error">⚠ {{ tr_stored(e) }}</div>{% endfor %}
+  <p>{{ _("範本：") }}
+    {% if it.building %}<span class="tag building">{{ _("建置/測試中") }}</span>
+    {% elif it.t %}<span class="tag {{ it.t.status }}">{{ it.t.status }}</span>
+      {% if it.t.vmid %}VMID {{ it.t.vmid }} · {{ it.t.built_at }}{% endif %}
+      {% if it.outdated %}<span class="warn">⚠ {{ _("setup 已變更，需重新建置") }}</span>{% endif %}
+      {% if it.t.selftest %}· {{ _("自我測試") }}
+        {% if it.t.selftest.ok %}<span class="ok">{{ _("通過") }}</span>{% else %}<span class="bad">{{ _("未通過") }}</span>{% endif %}
+        {% if it.t.selftest.solved_score is defined %}{{ _("（未修正 {broken}，解答後 {solved} / {total}）", broken=it.t.selftest.broken_score, solved=it.t.selftest.solved_score, total=it.t.selftest.total) }}
+        {%- else %}{{ _("（未修正 {broken} / {total}）", broken=it.t.selftest.broken_score, total=it.t.selftest.total) }}{% endif %}
+      {% endif %}
+    {% else %}<span class="tag">{{ _("尚未建置") }}</span>{% endif %}
+  </p>
+  <p>{{ _("檢查項目 {n} 項，預設滿分 {total}", n=q.checks|length, total='%g' % q.default_total) }} ·
+    {{ _("使用於：") }}{% for x in it.in_sets %}<a href="/admin/sets/{{ x.id }}">{{ _("{mode}「{name}」", mode=_(MODES[x.mode]), name=x.name) }}</a>{{ _("、") if not loop.last }}{% else %}<span class="muted">{{ _("（沒有題組使用）") }}</span>{% endfor %}
+    <span class="muted">— {{ _("配分、限時、是否開放請到「題組」頁設定") }}</span></p>
+  <div class="actions">
+    <form class="inline" method="post" action="/admin/questions/{{ q.qid }}/build"><button {{ 'disabled' if it.building }}>{{ _("建置範本＋自我測試") }}</button></form>
+    <form class="inline" method="post" action="/admin/questions/{{ q.qid }}/selftest"><button {{ 'disabled' if it.building or not it.t or it.t.status != 'ready' }}>{{ _("只跑自我測試") }}</button></form>
+    <a class="btn" href="/admin/questions/{{ q.qid }}/export.zip">{{ _("下載 zip") }}</a>
+    <form class="inline" method="post" action="/admin/questions/{{ q.qid }}/delete" onsubmit='return confirm({{ _("刪除題目 {qid}？", qid=q.qid) | tojson }})'><button class="danger">{{ _("刪除") }}</button></form>
+  </div>
+</div>
+{% else %}
+<div class="card muted">{{ _("題庫是空的，請上傳題目包。") }}</div>
+{% endfor %}
+{% endblock %}

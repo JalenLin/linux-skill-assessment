@@ -1,0 +1,11 @@
+[project]
+name = "linux-skill-assessment"
+description = "Self-hosted Linux hands-on practice & assessment platform on Proxmox VE"
+license = "MIT"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+markers = ["e2e: 連真實部署的端對端測試（需設定 LSA_E2E_URL / LSA_E2E_ADMIN_PASSWORD）"]
+addopts = "-ra"

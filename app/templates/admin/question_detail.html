@@ -1,0 +1,31 @@
+{% extends "admin/base.html" %}
+{% block admin %}
+<p><a href="/admin/questions">← {{ _("題庫") }}</a></p>
+<div class="card">
+  <h2>{{ q.title_in() }} <span class="muted" style="font-size:14px">{{ q.qid }}</span></h2>
+  <div class="actions">
+    <form class="inline" method="post" action="/admin/questions/{{ q.qid }}/build"><button class="primary" {{ 'disabled' if building }}>{{ _("建置範本＋自我測試") }}</button></form>
+    <form class="inline" method="post" action="/admin/questions/{{ q.qid }}/selftest"><button {{ 'disabled' if building or not t or t.status != 'ready' }}>{{ _("只跑自我測試") }}</button></form>
+    {% if building %}<span class="tag building">{{ _("進行中…") }}</span> <a href="">{{ _("重新整理") }}</a>{% endif %}
+  </div>
+  {% if selftest %}
+    <p>{{ _("自我測試 {at}：", at=selftest.at) }}{% if selftest.ok %}<b class="ok">{{ _("通過") }}</b>{% else %}<b class="bad">{{ _("未通過") }}</b>{% endif %}
+      {% if selftest.error %}<span class="bad">{{ tr_stored(selftest.error) }}</span>{% endif %}</p>
+    <div class="grid2">
+      <div><b>{{ _("未修正狀態") }}</b>{{ _("（應為 0 分）：") }}{{ selftest.broken_score }} / {{ selftest.total }}
+        {% for i in selftest.broken_items or [] %}<div class="result-item"><span>{{ '✅' if i.passed else '❌' }} {{ q.check_desc(i.id) if i.id else i.desc }}</span></div>{% endfor %}</div>
+      {% if selftest.solved_score is defined %}
+      <div><b>{{ _("套用 solution.yml 後") }}</b>{{ _("（應為滿分）：") }}{{ selftest.solved_score }} / {{ selftest.total }}
+        {% for i in selftest.solved_items or [] %}<div class="result-item"><span>{{ '✅' if i.passed else '❌' }} {{ q.check_desc(i.id) if i.id else i.desc }}</span></div>{% endfor %}</div>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+<div class="grid2">
+  <div class="card"><h2>{{ _("題目敘述（作答者看到）") }}</h2>{{ q.description_html_in() | safe }}</div>
+  <div class="card"><h2>{{ _("建置紀錄") }}</h2><pre style="max-height:500px">{{ tr_lines(t.log) if t and t.log else _("（無）") }}</pre></div>
+</div>
+{% for name, text in files.items() %}
+<div class="card"><h2>{{ name }}</h2><pre>{{ text }}</pre></div>
+{% endfor %}
+{% endblock %}

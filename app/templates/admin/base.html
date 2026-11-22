@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}{{ _("後台") }} - {{ tr_stored(settings().site_title) }}{% endblock %}
+{% block nav %}
+  <a href="/admin">{{ _("成績總覽") }}</a>
+  <a href="/admin/summary">{{ _("練習總表") }}</a>
+  <a href="/admin/sets">{{ _("題組（測驗/練習）") }}</a>
+  <a href="/admin/questions">{{ _("題庫") }}</a>
+  <a href="/admin/accounts">{{ _("帳號") }}</a>
+  <a href="/admin/instances">{{ _("實例") }}</a>
+  <a href="/admin/settings">{{ _("系統設定") }}</a>
+{% endblock %}
+{% block right %}
+  {% set ex = open_assessment() %}
+  {% if ex %}<a class="tag running" href="/admin?set={{ ex.id }}">{{ _("測驗進行中：{name}", name=ex.name) }}</a>
+  {% else %}<span class="tag">{{ _("目前無測驗進行") }}</span>{% endif %}
+  <a href="/admin/logout">{{ _("登出") }}</a>
+{% endblock %}
+{% block content %}
+  {% if jobs %}<div class="msg">{% for k, v in jobs.items() %}<div><b>{{ tr_stored(k) }}</b>{{ _("：") }}{{ tr_stored(v) }}</div>{% endfor %}</div>{% endif %}
+  {% block admin %}{% endblock %}
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "admin/base.html" %}
+{% block mainclass %}wide{% endblock %}
+{% block admin %}
+<div class="card">
+  <h2>{{ _("練習總表") }} <span class="muted" style="font-size:14px;font-weight:normal">{{ _("每次練習的出席與得分") }}</span></h2>
+  <form method="get" action="/admin/summary">
+    <div class="actions" style="align-items:center;flex-wrap:wrap">
+      {% for x in all_sets %}
+      <label style="margin:0"><input type="checkbox" name="sets" value="{{ x.id }}" {{ 'checked' if x in cols }}>
+        {{ _("{mode}「{name}」", mode=_(MODES[x.mode]), name=x.name) }}</label>
+      {% endfor %}
+    </div>
+    <div class="actions" style="align-items:center">
+      <label style="margin:0">{{ _("晚到超過") }} <input class="small" type="number" name="late" value="{{ late_min }}" min="0"> {{ _("分鐘標示") }}</label>
+      <button class="primary">{{ _("更新") }}</button>
+      <a class="btn" href="/admin/summary.csv?{{ qs }}">{{ _("匯出 CSV") }}</a>
+    </div>
+  </form>
+  <p class="muted">{{ _("出席 = 該題組開放時間內有進入題組、開題、連終端機或按檢查（只登入不算）。") }}
+    {{ _("預設列出所有練習題組，依開始時間排序。") }}<b>{{ _("練習請設定開始/結束時間") }}</b>{{ _("（例如上課或面試時段），") }}
+    {{ _("出席判定與晚到才有依據，結束後作答者也不能再檢查，成績就固定了。") }}</p>
+</div>
+<div class="card" style="overflow:auto">
+  <table class="matrix">
+    <tr><th>{{ _("編號") }}</th>
+      {% for d in data %}<th title="{{ d.s.start_at }} {{ _("～") }} {{ d.s.end_at }}"><a href="/admin?set={{ d.s.id }}">{{ d.s.name }}</a><br>
+        <span class="muted">{{ d.s.start_at[5:10] if d.s.start_at else '' }} · /{{ '%g' % d.total }} · {{ _("到 {n}", n=d.n_present) }}</span></th>{% endfor %}
+      <th>{{ _("出席") }}</th><th>{{ _("總分") }}<br><span class="muted">/{{ '%g' % grand }}</span></th></tr>
+    {% for r in rows %}
+    <tr><td><a href="/admin/participant/{{ r.acc.id }}">{{ r.acc.participant_code }}</a></td>
+      {% for c in r.cells %}
+        {% if not c.present %}<td class="zero">{{ _("缺") }}{% if c.score %} <span class="muted">{{ '%g' % c.score }}</span>{% endif %}</td>
+        {% else %}<td class="{{ 'part' if c.late is not none and c.late >= late_min else 'full' }}">{{ '%g' % c.score }}
+          {% if c.late is not none and c.late >= late_min %}<span class="muted">{{ _("晚{n}", n=c.late) }}</span>{% endif %}</td>{% endif %}
+      {% endfor %}
+      <td class="num">{{ r.n_present }} / {{ data|length }}</td><td class="num"><b>{{ '%g' % r.got }}</b></td></tr>
+    {% else %}<tr><td class="muted">{{ _("沒有已綁定編號的作答者") }}</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

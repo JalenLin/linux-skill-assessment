@@ -1,0 +1,104 @@
+{% extends "admin/base.html" %}
+{% block admin %}
+<p><a href="/admin/sets">← {{ _("題組列表") }}</a> · <a href="/admin?set={{ st.id }}">{{ _("成績") }}</a></p>
+<form method="post" action="/admin/sets/{{ st.id }}">
+<div class="card">
+  <h2>{{ st.name }} <span class="tag {{ 'running' if participant_state == 'open' }}">{{ _("作答者端：{state}", state=_(STATE_LABEL[participant_state])) }}</span></h2>
+  <div class="grid2">
+    <div><label>{{ _("名稱") }}</label><input type="text" name="name" value="{{ st.name }}"></div>
+    <div><label>{{ _("類型") }}</label>
+      <select name="mode">
+        <option value="practice" {{ 'selected' if st.mode == 'practice' }}>{{ _("練習（不計入測驗；時間可不限）") }}</option>
+        <option value="assessment" {{ 'selected' if st.mode == 'assessment' }}>{{ _("測驗（需設定時間；結束後停止環境、可最終校驗）") }}</option>
+      </select></div>
+    <div><label>{{ _("開始時間") }}</label><input type="datetime-local" name="start_at" value="{{ st.start_at }}"></div>
+    <div><label>{{ _("結束時間") }}</label><input type="datetime-local" name="end_at" value="{{ st.end_at }}"></div>
+  </div>
+  <p class="muted">{{ _("練習題組時間可留空：開始留空 = 立即開放，結束留空 = 一直開放。測驗題組兩個都要填。") }}</p>
+  <label><input type="checkbox" name="visible" {{ 'checked' if st.visible }}> {{ _("作答者可見（取消勾選 = 草稿，作答者看不到）") }}</label>
+  <label>{{ _("題組公告（作答者在題目列表上方看到）") }}</label>
+  <textarea name="notice" rows="2">{{ st.notice }}</textarea>
+</div>
+<div class="card">
+  <h2>{{ _("作答與計分") }}</h2>
+  <div class="grid2">
+    <div>
+      <label>{{ _("計分方式") }}</label>
+      <select name="score_policy">
+        <option value="best" {{ 'selected' if st.score_policy == 'best' }}>{{ _("取每題最高分") }}</option>
+        <option value="latest" {{ 'selected' if st.score_policy == 'latest' }}>{{ _("取每題最後一次檢查") }}</option>
+        <option value="final" {{ 'selected' if st.score_policy == 'final' }}>{{ _("只採計結束後「最終校驗」") }}</option>
+      </select>
+      <p class="muted">{{ _("單題限時的題目一律取作答時間內的最高分。") }}</p>
+    </div>
+    <div><label>{{ _("檢查冷卻時間（秒）") }}</label><input type="number" name="cooldown_sec" value="{{ st.cooldown_sec }}" min="0"></div>
+    <div>
+      <label><input type="checkbox" name="show_detail" {{ 'checked' if st.show_detail }}> {{ _("作答者可看到每個檢查項目是否通過") }}</label>
+      <p class="muted">{{ _("關閉時作答者只看到總分。練習建議開啟。") }}</p>
+    </div>
+    <div>
+      <label><input type="checkbox" name="block_paste" {{ 'checked' if st.block_paste }}> {{ _("禁止在終端機貼上") }}</label>
+      <p class="muted">{{ _("Ctrl+V、右鍵、拖放都會被擋，伺服器端也會丟棄並記錄。中文輸入法一次送出多個字也會被視為貼上。") }}</p>
+    </div>
+    <div><label>{{ _("排序") }}</label><input class="small" type="number" name="sort_order" value="{{ st.sort_order }}"></div>
+  </div>
+  <button class="primary" type="submit">{{ _("儲存題組設定") }}</button>
+</div>
+</form>
+
+<div class="card">
+  <h2>{{ _("題目") }} <span class="muted" style="font-size:14px;font-weight:normal">{{ _("已納入的合計 {n} 分", n='%g' % total) }}</span></h2>
+  <p class="muted">{{ _("勾選「納入」並儲存，該題就會出現在這個題組。單題限時 0 = 不限時（在題組開放時間內自由作答）。") }}</p>
+  <table>
+    <tr><th>{{ _("題目") }}</th><th>{{ _("範本") }}</th><th>{{ _("設定") }}</th></tr>
+    {% for it in items %}{% set q = it.q %}
+    <tr>
+      <td><b>{{ q.title_in() }}</b><br><span class="muted">{{ q.qid }} · {{ 'LXC' if q.kind == 'lxc' else 'VM' }}{% if it.n_inst %} · {{ _("實例 {n}", n=it.n_inst) }}{% endif %}</span></td>
+      <td>{% if it.ready %}<span class="tag running">ready</span>{% else %}<a class="tag" href="/admin/questions">{{ _("未建置") }}</a>{% endif %}</td>
+      <td>
+        <form method="post" action="/admin/sets/{{ st.id }}/q/{{ q.qid }}">
+          <div class="actions" style="align-items:center;margin:0">
+            <label style="margin:0"><input type="checkbox" name="enabled" {{ 'checked' if it.e.enabled }}> {{ _("納入") }}</label>
+            <label style="margin:0">{{ _("排序") }} <input class="small" type="number" name="sort_order" value="{{ it.e.sort_order }}"></label>
+            <label style="margin:0">{{ _("限時") }} <input class="small" type="number" name="time_limit_min" min="0" value="{{ it.e.time_limit_min or 0 }}"> {{ _("分") }}</label>
+            <label style="margin:0" title="{{ _("限時題目可以開始作答的次數，0 = 不限") }}">{{ _("次數") }} <input class="small" type="number" name="max_attempts" min="0" value="{{ it.e.max_attempts or 0 }}"></label>
+            <button class="primary">{{ _("儲存") }}</button>
+          </div>
+          <details><summary class="muted">{{ _("配分 {pts} 分（{n} 項）", pts='%g' % (it.checks | sum(attribute='points')), n=it.checks|length) }}</summary>
+            <table>
+              {% for c in it.checks %}
+              <tr><td><code>{{ c.id }}</code></td><td>{{ q.check_desc(c.id) }}</td>
+                <td class="num muted">{{ _("預設 {n}", n='%g' % q.checks[loop.index0].points) }}</td>
+                <td class="num"><input class="small" type="number" step="0.5" min="0" name="points_{{ c.id }}" value="{{ '%g' % c.points }}"></td></tr>
+              {% endfor %}
+            </table>
+          </details>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h2>{{ _("環境") }}</h2>
+  <div class="actions">
+    <form class="inline" method="post" action="/admin/sets/{{ st.id }}/prewarm" onsubmit='return confirm({{ _("為已綁定編號的帳號預先建立本題組所有題目的環境（每個約 7 秒，背景執行）？") | tojson }})'>
+      <button class="primary">{{ _("預先建立實例") }}</button>
+      <label class="inline muted"><input type="checkbox" name="all_accounts"> {{ _("包含尚未綁定編號的帳號") }}</label></form>
+    <form class="inline" method="post" action="/admin/sets/{{ st.id }}/destroy_instances" onsubmit='return confirm({{ _("刪除本題組所有作答者的環境？（成績紀錄保留）") | tojson }})'>
+      <input type="text" name="confirm" placeholder="{{ _("輸入 DELETE") }}" style="width:120px">
+      <button class="danger">{{ _("刪除此題組所有實例") }}</button></form>
+  </div>
+  <p class="muted">{{ _("測驗前建議先預先建立，測驗開始時作答者只需要啟動。練習通常不需要預先建立（第一次開題約 10~30 秒）。") }}
+    {{ _("每個實例佔一個磁碟（LVM），全系統可容納的數量有限：題組結束、成績確定後請刪除該題組的實例。") }}</p>
+</div>
+
+<div class="card">
+  <h2>{{ _("刪除題組") }}</h2>
+  <form method="post" action="/admin/sets/{{ st.id }}/delete" class="actions" onsubmit='return confirm({{ _("刪除題組與其所有成績紀錄？") | tojson }})'>
+    <input type="text" name="confirm" placeholder="{{ _("輸入題組名稱確認") }}" style="width:200px">
+    <button class="danger">{{ _("刪除題組（含成績紀錄）") }}</button>
+  </form>
+</div>
+{% endblock %}
