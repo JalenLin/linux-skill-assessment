@@ -23,8 +23,8 @@ The fastest way to start is to copy the example question [`questions/example-hel
 ```
 example-hello/            folder name = question id (lowercase letters, digits and -)
 ├── question.yaml         required: title, type, resources, check items and points
-├── description.md        required: the question description participants see (Markdown)
-├── description.en.md     optional: the question description in another language
+├── description.md        required: the question description participants see (Markdown, main language)
+├── description.zh-TW.md  optional: the description in another language (description.<code>.md)
 ├── setup.yml             required: runs when building the template; installs packages and "plants faults"
 ├── check.yml             required: grading
 ├── solution.yml          optional (strongly recommended): reference solution, used by the self-test
@@ -57,31 +57,33 @@ These map to three check items (`checks` in `question.yaml`):
 ## question.yaml
 
 ```yaml
-title: Hello 服務無法啟動（範例題）
+title: The hello service won't start (example)
 type: lxc            # lxc (container, default) or vm
 hostname: hello      # host name participants see
 resources:
   cores: 1
   memory: 512        # MB; 1024 recommended for vm
-lang: zh-TW          # optional: language of the main content, default zh-TW
+lang: en             # optional: language of the main content, default zh-TW
 checks:              # check items; points can be adjusted per question set, these are the defaults
   - id: page
-    desc: 從其他電腦瀏覽 http://<本機>:8000/ 可看到 Hello Lab
+    desc: "http://<host>:8000/ can be browsed from another computer and shows Hello Lab"
     points: 6
   - id: boot
-    desc: hello 服務設為開機自動啟動
+    desc: The hello service is enabled to start at boot
     points: 2
   - id: restart
-    desc: 重新啟動 hello 服務後網頁仍正常
+    desc: The page still works after restarting the hello service
     points: 2
 i18n:                # optional: other languages (see "Multiple languages")
-  en:
-    title: The hello service won't start (example)
+  zh-TW:
+    title: Hello 服務無法啟動（範例題）
     checks:
-      page: "http://<host>:8000/ can be browsed from another computer and shows Hello Lab"
+      page: 從其他電腦瀏覽 http://<本機>:8000/ 可看到 Hello Lab
+      boot: hello 服務設為開機自動啟動
+      restart: 重新啟動 hello 服務後網頁仍正常
 ```
 
-(The example's main language is `zh-TW`, so `title` and `desc` are in Chinese; the English versions are in `i18n.en`.)
+(The example's main language is English with a Traditional Chinese translation in `i18n.zh-TW`.)
 
 - The `desc` of each check is the check-item description participants see (when the question set setting "Participants can see whether each check item passed" is on)
 - VM questions can have extra disks: add `extra_disks: [2]` under `resources` (in GB; they become `/dev/sdb`, `/dev/sdc`, … in order)
@@ -92,20 +94,19 @@ i18n:                # optional: other languages (see "Multiple languages")
 - hosts: target
   gather_facts: false
   tasks:
-    - name: 網頁目錄
+    - name: Web directory
       ansible.builtin.file: {path: /srv/hello, state: directory, mode: "0755"}
-    - name: 網頁內容
+    - name: Web page
       ansible.builtin.copy:
         dest: /srv/hello/index.html
         content: "Hello Lab\n"
         mode: "0600"           # fault 2
-    - name: 服務設定（含錯誤 1）
+    - name: Service unit (contains fault 1)
       ansible.builtin.copy: {src: files/hello.service, dest: /etc/systemd/system/hello.service}
-    - name: 錯誤 3：沒有設定開機啟動
+    - name: "Fault 3: not enabled at boot"
       ansible.builtin.systemd_service: {name: hello, daemon_reload: true, enabled: false}
 ```
 
-(Task names in the example are in Chinese: web page directory, web page content, service unit (contains fault 1), fault 3: not enabled at boot.)
 
 - Runs as root on a **full copy** of the base template (Ubuntu 24.04, already has a `user`/`user` account with sudo, openssh, python3, curl, cron)
 - **Internet access is available** during the build (apt and docker pull both work); **during an assessment the participant environment has no internet access**, so every package and image you need must be installed here
@@ -120,7 +121,7 @@ i18n:                # optional: other languages (see "Multiple languages")
   gather_facts: false
   ignore_errors: true          # required: keep checking other items after one fails
   tasks:
-    - name: "check:page 從評分主機瀏覽網頁"
+    - name: "check:page browse the page from the grading host"
       ansible.builtin.uri:
         url: "http://{{ target_ip }}:8000/"
         return_content: true
@@ -129,14 +130,14 @@ i18n:                # optional: other languages (see "Multiple languages")
       failed_when: page.status != 200 or 'Hello Lab' not in page.content
       delegate_to: localhost   # runs on the grading host, out of the participant's reach
 
-    - name: "check:boot 開機自動啟動"
+    - name: "check:boot enabled at boot"
       ansible.builtin.command: systemctl is-enabled hello
       changed_when: false
 ```
 
 Rules:
 
-- A task whose name starts with **`check:<id>`** maps to that check item in question.yaml; a description may follow (in the example: "browse the page from the grading host", "enabled at boot")
+- A task whose name starts with **`check:<id>`** maps to that check item in question.yaml; a description may follow
 - One id can have several tasks; the item scores only if **all of them succeed**; a skipped task also counts as a failure
 - The variable `target_ip` is the participant environment's IP
 - This same file runs both when a participant presses "Check answer" and for the "final grading" after an assessment ends
@@ -189,36 +190,28 @@ The participant interface can switch languages, and questions can optionally pro
 
 - `lang:` in `question.yaml`: the language of the main content (`title`, `description.md`, and the `desc` of `checks`); default `zh-TW`
 - Add an `i18n:` block to `question.yaml` to provide the title and check-item descriptions per language code; the keys under `checks` must be `id`s that already exist in `checks:`
-- Save the question description separately as `description.<language code>.md`, e.g. `description.en.md` (keep commands, paths and code blocks as they are)
+- Save translated descriptions as `description.<language code>.md` (keep commands, paths and code blocks as they are)
+- Language codes must match the UI language codes: `zh-TW`, `en` (`zh` would not be picked up)
 - Missing translations automatically fall back to the main content
 - Changing translations does not require rebuilding the template
 
-```yaml
-i18n:
-  en:
-    title: The hello service won't start (example)
-    checks:
-      page: "http://<host>:8000/ can be browsed from another computer and shows Hello Lab"
-      boot: The hello service is enabled to start at boot
-      restart: The page still works after restarting the hello service
-```
+The example is **English with a Chinese translation**: `lang: en`, with the Chinese in `i18n: zh-TW:` (see question.yaml above)
+and `description.zh-TW.md`.
 
-**English as the main language with a Chinese translation** works the same way: set `lang: en`, write `title`, `desc`
-and `description.md` in English, and put the Chinese in `i18n: zh-TW:` and `description.zh-TW.md`. Language codes must
-match the UI language codes (`zh-TW`, `en`); `zh` would not be picked up.
+For **Chinese with an English translation**, do the opposite: omit `lang`, write `title`, `desc` and `description.md` in Chinese,
+and put the English in `i18n: en:` and `description.en.md`:
 
 ```yaml
-title: The hello service won't start
-lang: en
+title: Hello 服務無法啟動
 checks:
   - id: page
-    desc: The page shows Hello Lab on port 8000
+    desc: 從其他電腦瀏覽 http://<本機>:8000/ 可看到 Hello Lab
     points: 6
 i18n:
-  zh-TW:
-    title: Hello 服務無法啟動
+  en:
+    title: The hello service won't start
     checks:
-      page: 8000 port 顯示 Hello Lab
+      page: "http://<host>:8000/ can be browsed from another computer and shows Hello Lab"
 ```
 
 ## Development and testing workflow

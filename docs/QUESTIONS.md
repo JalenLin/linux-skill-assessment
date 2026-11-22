@@ -23,8 +23,8 @@
 ```
 example-hello/            資料夾名稱 = 題目 id（小寫英數與 -）
 ├── question.yaml         必要：標題、類型、資源、檢查項目與配分
-├── description.md        必要：作答者看到的題目敘述（Markdown）
-├── description.en.md     選用：其他語言的題目敘述
+├── description.md        必要：作答者看到的題目敘述（Markdown，主要語言）
+├── description.zh-TW.md  選用：其他語言的題目敘述（description.<語言代碼>.md）
 ├── setup.yml             必要：建置範本時執行，安裝套件並「埋錯」
 ├── check.yml             必要：評分
 ├── solution.yml          選用（強烈建議）：標準解答，自我測試用
@@ -57,29 +57,34 @@ example-hello/            資料夾名稱 = 題目 id（小寫英數與 -）
 ## question.yaml
 
 ```yaml
-title: Hello 服務無法啟動（範例題）
+title: The hello service won't start (example)
 type: lxc            # lxc（容器，預設）或 vm
 hostname: hello      # 作答者看到的主機名稱
 resources:
   cores: 1
   memory: 512        # MB；vm 建議 1024
-lang: zh-TW          # 選用：主要內容的語言，預設 zh-TW
+lang: en             # 選用：主要內容的語言，預設 zh-TW
 checks:              # 檢查項目；配分在各題組可以另外調整，這裡是預設值
   - id: page
-    desc: 從其他電腦瀏覽 http://<本機>:8000/ 可看到 Hello Lab
+    desc: "http://<host>:8000/ can be browsed from another computer and shows Hello Lab"
     points: 6
   - id: boot
-    desc: hello 服務設為開機自動啟動
+    desc: The hello service is enabled to start at boot
     points: 2
   - id: restart
-    desc: 重新啟動 hello 服務後網頁仍正常
+    desc: The page still works after restarting the hello service
     points: 2
 i18n:                # 選用：其他語言（見「多國語言」）
-  en:
-    title: The hello service won't start (example)
+  zh-TW:
+    title: Hello 服務無法啟動（範例題）
     checks:
-      page: "http://<host>:8000/ can be browsed from another computer and shows Hello Lab"
+      page: 從其他電腦瀏覽 http://<本機>:8000/ 可看到 Hello Lab
+      boot: hello 服務設為開機自動啟動
+      restart: 重新啟動 hello 服務後網頁仍正常
 ```
+
+範例題以英文為主要語言、附繁體中文翻譯；你的題目用中文為主的話，`lang` 不寫（預設 `zh-TW`），
+`title`、`desc` 寫中文，翻譯放在 `i18n: en:`。
 
 - `checks` 的 `desc` 是作答者看到的檢查項目說明（題組設定「作答者可看到每個檢查項目是否通過」時）
 - VM 題可以加額外磁碟：`resources` 底下加 `extra_disks: [2]`（單位 GB，依序成為 `/dev/sdb`、`/dev/sdc`…）
@@ -90,16 +95,16 @@ i18n:                # 選用：其他語言（見「多國語言」）
 - hosts: target
   gather_facts: false
   tasks:
-    - name: 網頁目錄
+    - name: Web directory
       ansible.builtin.file: {path: /srv/hello, state: directory, mode: "0755"}
-    - name: 網頁內容
+    - name: Web page
       ansible.builtin.copy:
         dest: /srv/hello/index.html
         content: "Hello Lab\n"
         mode: "0600"           # 錯誤 2
-    - name: 服務設定（含錯誤 1）
+    - name: Service unit (contains fault 1)
       ansible.builtin.copy: {src: files/hello.service, dest: /etc/systemd/system/hello.service}
-    - name: 錯誤 3：沒有設定開機啟動
+    - name: "Fault 3: not enabled at boot"
       ansible.builtin.systemd_service: {name: hello, daemon_reload: true, enabled: false}
 ```
 
@@ -116,7 +121,7 @@ i18n:                # 選用：其他語言（見「多國語言」）
   gather_facts: false
   ignore_errors: true          # 必要：某項失敗後繼續檢查其他項
   tasks:
-    - name: "check:page 從評分主機瀏覽網頁"
+    - name: "check:page browse the page from the grading host"
       ansible.builtin.uri:
         url: "http://{{ target_ip }}:8000/"
         return_content: true
@@ -125,7 +130,7 @@ i18n:                # 選用：其他語言（見「多國語言」）
       failed_when: page.status != 200 or 'Hello Lab' not in page.content
       delegate_to: localhost   # 在評分主機執行，作答者改不到
 
-    - name: "check:boot 開機自動啟動"
+    - name: "check:boot enabled at boot"
       ansible.builtin.command: systemctl is-enabled hello
       changed_when: false
 ```
@@ -185,35 +190,26 @@ LXC 容器是 unprivileged + nesting，可以跑 Docker。
 
 - `question.yaml` 的 `lang:`：主要內容（`title`、`description.md`、`checks` 的 `desc`）的語言，預設 `zh-TW`
 - `question.yaml` 加 `i18n:` 區塊，依語言代碼提供標題與各檢查項目的說明；`checks` 底下的 key 必須是 `checks:` 裡已有的 `id`
-- 題目敘述另存成 `description.<語言代碼>.md`，例如 `description.en.md`（指令、路徑、code block 保持原樣）
+- 題目敘述另存成 `description.<語言代碼>.md`（指令、路徑、code block 保持原樣）
+- 語言代碼要和介面語言代碼一致：`zh-TW`、`en`（寫 `zh` 不會被採用）
 - 缺少的翻譯會自動改用主要內容顯示
 - 修改翻譯不需要重新建置範本
 
-```yaml
-i18n:
-  en:
-    title: The hello service won't start (example)
-    checks:
-      page: "http://<host>:8000/ can be browsed from another computer and shows Hello Lab"
-      boot: The hello service is enabled to start at boot
-      restart: The page still works after restarting the hello service
-```
+範例題是**英文為主、附中文**：`lang: en`，中文放在 `i18n: zh-TW:`（見上方 question.yaml）與 `description.zh-TW.md`。
 
-**以英文為主要語言、另附中文**也可以：`lang: en`，`title`／`desc`／`description.md` 寫英文，
-中文放在 `i18n: zh-TW:` 與 `description.zh-TW.md`。語言代碼要和介面語言代碼一致（`zh-TW`、`en`），寫 `zh` 不會被採用。
+**中文為主、附英文**則反過來：`lang` 不寫，`title`／`desc`／`description.md` 寫中文，英文放在 `i18n: en:` 與 `description.en.md`：
 
 ```yaml
-title: The hello service won't start
-lang: en
+title: Hello 服務無法啟動
 checks:
   - id: page
-    desc: The page shows Hello Lab on port 8000
+    desc: 從其他電腦瀏覽 http://<本機>:8000/ 可看到 Hello Lab
     points: 6
 i18n:
-  zh-TW:
-    title: Hello 服務無法啟動
+  en:
+    title: The hello service won't start
     checks:
-      page: 8000 port 顯示 Hello Lab
+      page: "http://<host>:8000/ can be browsed from another computer and shows Hello Lab"
 ```
 
 ## 開發與測試流程

@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 User=nobody
-# 錯誤 1：Ubuntu 24.04 沒有 /usr/bin/python（只有 python3）
+# fault 1: Ubuntu 24.04 has no /usr/bin/python (only python3)
 ExecStart=/usr/bin/python -m http.server 8000 --directory /srv/hello
 Restart=on-failure
 

@@ -16,10 +16,13 @@ def test_example_question_is_valid():
     assert [c.id for c in q.checks] == ["page", "boot", "restart"]
     assert sum(c.points for c in q.checks) == 10
     assert q.has_solution
-    assert q.languages == ["zh-TW", "en"]
+    assert q.languages == ["en", "zh-TW"]                       # 主要語言英文，附中文翻譯
     assert q.title_in("en") == "The hello service won't start (example)"
+    assert q.title_in("zh-TW") == "Hello 服務無法啟動（範例題）"
     assert q.title_in("ja") == q.title                          # 沒有翻譯 → 原文
-    assert "Hello Lab" in q.description_html_in("en")
+    assert "範例題" in q.description_html_in("zh-TW")
+    assert "example question" in q.description_html_in("en")
+    assert q.check_desc("boot", "zh-TW") == "hello 服務設為開機自動啟動"
     assert q.check_desc("boot", "en") == "The hello service is enabled to start at boot"
 
 

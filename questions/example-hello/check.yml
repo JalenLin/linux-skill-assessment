@@ -1,12 +1,13 @@
-# 校驗：作答者按「檢查作答」時執行（考後最終校驗也是這份）。
-# - task 名稱以 "check:<id>" 開頭，對應 question.yaml 的 checks；同一個 id 的 task 全部成功才得分
-# - 變數 target_ip = 作答者環境的 IP
-# - 作答者在環境裡有 root，能改掉 curl、systemctl；能從外部驗證的就 delegate_to: localhost（在評分主機執行）
+# Grading: runs when the participant presses "Check answer" (the final check after the set ends uses it too).
+# - task names start with "check:<id>", matching checks in question.yaml; an id scores only if all its tasks succeed
+# - variable target_ip = IP of the participant's environment
+# - participants have root in their environment and could tamper with curl or systemctl; whatever can be
+#   verified from outside, run with delegate_to: localhost (on the grading host)
 - hosts: target
   gather_facts: false
-  ignore_errors: true          # 必要：某項失敗後繼續檢查其他項
+  ignore_errors: true          # required: keep checking the other items after one fails
   tasks:
-    - name: "check:page 從評分主機瀏覽網頁"
+    - name: "check:page browse the page from the grading host"
       ansible.builtin.uri:
         url: "http://{{ target_ip }}:8000/"
         return_content: true
@@ -15,24 +16,24 @@
       failed_when: page.status != 200 or 'Hello Lab' not in page.content
       delegate_to: localhost
 
-    - name: "check:boot 開機自動啟動"
+    - name: "check:boot enabled at boot"
       ansible.builtin.command: systemctl is-enabled hello
       changed_when: false
 
-    # 「重新啟動後仍正常」：在檢查裡實際重啟一次再驗證
-    - name: "check:restart 重新啟動服務"
+    # "still works after a restart": actually restart it during the check, then verify
+    - name: "check:restart restart the service"
       ansible.builtin.systemd_service:
         name: hello
         state: restarted
 
-    - name: "check:restart 等服務開好"
+    - name: "check:restart wait for the service"
       ansible.builtin.wait_for:
         host: "{{ target_ip }}"
         port: 8000
         timeout: 10
       delegate_to: localhost
 
-    - name: "check:restart 重啟後再瀏覽一次"
+    - name: "check:restart browse again after the restart"
       ansible.builtin.uri:
         url: "http://{{ target_ip }}:8000/"
         return_content: true

@@ -1,21 +1,21 @@
-# 標準解答（選用，強烈建議）：後台「自我測試」會確認
-#   未作答 → check.yml 得 0 分；套用本解答 → 滿分
-# 作答者看不到這個檔案。
+# Reference solution (optional, strongly recommended): the admin "Self-test" verifies that
+#   unsolved → check.yml scores 0; after applying this solution → full marks
+# Participants never see this file.
 - hosts: target
   gather_facts: false
   tasks:
-    - name: 修正 ExecStart 的 python 路徑
+    - name: Fix the python path in ExecStart
       ansible.builtin.replace:
         path: /etc/systemd/system/hello.service
         regexp: '/usr/bin/python '
         replace: '/usr/bin/python3 '
 
-    - name: 讓 nobody 讀得到網頁
+    - name: Let nobody read the page
       ansible.builtin.file:
         path: /srv/hello/index.html
         mode: "0644"
 
-    - name: 啟動並設定開機啟動
+    - name: Start it and enable at boot
       ansible.builtin.systemd_service:
         name: hello
         daemon_reload: true

@@ -102,7 +102,7 @@ Details: [docs/en/OPERATIONS.md](docs/en/OPERATIONS.md).
 ## Writing questions
 
 A question is a folder: `question.yaml` (title, checks, points), `description.md`, `setup.yml` (Ansible: install and break things),
-`check.yml` (Ansible tasks named `check:<id>`), optional `solution.yml` and translations (`description.en.md`, an `i18n:` block).
+`check.yml` (Ansible tasks named `check:<id>`), optional `solution.yml` and translations (`description.zh-TW.md`, an `i18n:` block).
 Start by copying [`questions/example-hello`](questions/example-hello); see [docs/en/QUESTIONS.md](docs/en/QUESTIONS.md).
 
 Keep your real questions (which contain solutions) in a separate, private repository and load them with

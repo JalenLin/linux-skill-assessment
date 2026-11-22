@@ -1,30 +1,30 @@
-# 建置範本時執行一次（以 root、可上網）：安裝需要的東西，並「埋入錯誤」。
-# 測驗時作答者的環境不能上網，要用到的套件都要在這裡先裝好。
+# Runs once when the template is built (as root, with internet access): install what is needed and plant the faults.
+# Participant environments have no internet access, so install every package you need here.
 - hosts: target
   gather_facts: false
   tasks:
-    # base 範本已經有 python3、curl、openssh、sudo；需要其他套件就用 apt：
+    # The base template already has python3, curl, openssh and sudo; use apt for anything else:
     # - ansible.builtin.apt: {name: [nginx], update_cache: true}
 
-    - name: 網頁目錄
+    - name: Web directory
       ansible.builtin.file:
         path: /srv/hello
         state: directory
         mode: "0755"
 
-    - name: 網頁內容
+    - name: Web page
       ansible.builtin.copy:
         dest: /srv/hello/index.html
         content: "Hello Lab\n"
-        mode: "0600"           # 錯誤 2：服務以 nobody 執行，讀不到 0600、屬於 root 的檔案
+        mode: "0600"           # fault 2: the service runs as nobody and cannot read a root-owned 0600 file
 
-    - name: 服務設定（含錯誤 1，見 files/hello.service）
+    - name: Service unit (contains fault 1, see files/hello.service)
       ansible.builtin.copy:
         src: files/hello.service
         dest: /etc/systemd/system/hello.service
         mode: "0644"
 
-    - name: 錯誤 3：沒有設定開機啟動
+    - name: "Fault 3: not enabled at boot"
       ansible.builtin.systemd_service:
         name: hello
         daemon_reload: true

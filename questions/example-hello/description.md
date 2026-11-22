@@ -1,16 +1,16 @@
-這是一個**範例題**，示範題目包怎麼寫。
+This is an **example question** that shows how to write a question package.
 
-這台主機有一個用 systemd 管理的小網站服務 `hello`，
-應該要在 **8000 port** 顯示 `Hello Lab`，網頁內容放在 `/srv/hello/`。
+This host has a small web service called `hello`, managed by systemd.
+It should show `Hello Lab` on **port 8000**; the page lives in `/srv/hello/`.
 
-但服務起不來，`curl http://localhost:8000/` 也連不上。請修好它：
+But the service won't start and `curl http://localhost:8000/` can't connect. Fix it so that:
 
-1. 服務可以正常啟動，網頁顯示 `Hello Lab`
-2. 開機會自動啟動
-3. 重新啟動服務後仍然正常
+1. The service starts and the page shows `Hello Lab`
+2. It starts automatically at boot
+3. It still works after the service is restarted
 
-提示：
+Hints:
 
-- 問題不只一個，`systemctl status hello`、`journalctl -u hello` 會告訴你很多事情
-- 服務設定檔在 `/etc/systemd/system/hello.service`，改完記得 `systemctl daemon-reload`
-- 帳號 `user` 可使用 `sudo`
+- There is more than one problem; `systemctl status hello` and `journalctl -u hello` tell you a lot
+- The unit file is `/etc/systemd/system/hello.service`; run `systemctl daemon-reload` after editing it
+- The account `user` can use `sudo`
