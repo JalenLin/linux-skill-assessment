@@ -137,7 +137,8 @@ The attendance column in the Score overview shows the number of IPs; one person 
   - Instances: environments and status for each question in each question set
   - Timed attempts: "End now" (and reset the environment), "Reset attempts"
   - Check history: the time, score, and message of each check; click in to see each check item and the Ansible output
-  - Terminal logs: one entry per terminal connection, listing start time, question set, question, length, number of inputs and blocked pastes
+  - Terminal logs: grouped by question set + question; each row shows the number of sessions, total time, best score (and number of checks) and latest activity.
+    Expand a row to see each terminal connection (start time, length, number of inputs, blocked pastes)
     - **Replay**: plays back like a video with asciinema-player (pause, speed, seek); idle periods longer than 2 seconds are shortened
     - On the right is the **input list** (each command line, keys such as arrows and ⌫, with times); click one to jump to it. Blocked pastes are shown in red
     - "Input text" and "Screen text" show plain text (easy to search and copy); ".cast" downloads the original file, which `asciinema play` can play locally

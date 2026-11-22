@@ -128,6 +128,26 @@ def list_for(account_id: int, set_names: dict[int, str] | None = None) -> list[d
     return out
 
 
+def group(rows: list[dict], runs: list[dict] = ()) -> list[dict]:
+    """依「題組＋題目」分組：連線次數、總時間、檢查次數與最高分；最近作答的題目排前面"""
+    groups: dict[tuple, dict] = {}
+    for r in rows:                                  # rows 已經依開始時間新→舊排好
+        g = groups.setdefault((r["set_id"], r["qid"]), {
+            "set_id": r["set_id"], "qid": r["qid"], "set_name": r["set_name"], "last": r["started"],
+            "sessions": [], "duration": 0.0, "blocked": 0, "checks": 0, "best": None, "max": None})
+        g["sessions"].append(r)
+        g["duration"] += r["duration"]
+        g["blocked"] += r["blocked"]
+    for run in runs:
+        g = groups.get((run["set_id"], run["qid"]))
+        if g is None or run["status"] != "done" or run["score"] is None:
+            continue
+        g["checks"] += 1
+        if g["best"] is None or run["score"] > g["best"]:
+            g["best"], g["max"] = run["score"], run["max_score"]
+    return sorted(groups.values(), key=lambda g: g["last"], reverse=True)
+
+
 def _keys(s: str) -> str:
     def rep(m: re.Match) -> str:
         k = m.group(0)

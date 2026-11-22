@@ -22,16 +22,30 @@
   </table>
   {% endif %}
   <h3>{{ _("終端機紀錄") }}</h3>
-  <table>
-    <tr><th>{{ _("開始") }}</th><th>{{ _("題組") }}</th><th>{{ _("題目") }}</th><th>{{ _("長度") }}</th><th>{{ _("輸入") }}</th><th></th></tr>
-    {% for l in logs %}<tr><td class="muted">{{ l.started }}</td><td>{{ l.set_name }}</td><td>{{ l.qid }}</td>
-      <td>{{ "%d:%02d" % (l.duration // 60, l.duration % 60) }}</td>
-      <td>{{ l.inputs }}{% if l.blocked %} <span class="tag failed">{{ _("貼上被擋 {n} 次", n=l.blocked) }}</span>{% endif %}</td>
-      <td><a href="/admin/recording/{{ acc.id }}/{{ l.name }}">{{ _("重播") }}</a> ·
-        <a href="/admin/shell_log/{{ acc.id }}/{{ l.name }}?view=input" target="_blank">{{ _("輸入文字") }}</a> ·
-        <a href="/admin/shell_log/{{ acc.id }}/{{ l.name }}?view=cast">.cast</a></td></tr>
-    {% else %}<tr><td colspan="6" class="muted">{{ _("無") }}</td></tr>{% endfor %}
-  </table>
+  {% macro mmss(sec) %}{{ "%d:%02d" % (sec // 60, sec % 60) }}{% endmacro %}
+  {% if logs %}
+  <div class="rec-groups">
+    <div class="rec-row rec-head"><span>{{ _("題組") }}</span><span>{{ _("題目") }}</span><span>{{ _("連線次數") }}</span><span>{{ _("總時間") }}</span><span>{{ _("最高分") }}</span><span>{{ _("最近") }}</span></div>
+    {% for g in logs %}
+    <details{% if logs|length == 1 %} open{% endif %}>
+      <summary class="rec-row"><span>{{ g.set_name }}</span><span>{{ g.qid }}</span>
+        <span>{{ _("{n} 次", n=g.sessions|length) }}{% if g.blocked %} <span class="tag failed">{{ _("貼上被擋 {n} 次", n=g.blocked) }}</span>{% endif %}</span>
+        <span>{{ mmss(g.duration) }}</span>
+        <span>{% if g.best is not none %}{{ "%g" % g.best }}/{{ "%g" % g.max }} <span class="muted">· {{ _("檢查 {n} 次", n=g.checks) }}</span>{% else %}<span class="muted">{{ _("未檢查") }}</span>{% endif %}</span>
+        <span class="muted">{{ g.last }}</span></summary>
+      <table class="rec-sessions">
+        <tr><th>{{ _("開始") }}</th><th>{{ _("長度") }}</th><th>{{ _("輸入") }}</th><th></th></tr>
+        {% for l in g.sessions %}<tr><td class="muted">{{ l.started }}</td><td>{{ mmss(l.duration) }}</td>
+          <td>{{ l.inputs }}{% if l.blocked %} <span class="tag failed">{{ _("貼上被擋 {n} 次", n=l.blocked) }}</span>{% endif %}</td>
+          <td><a href="/admin/recording/{{ acc.id }}/{{ l.name }}">{{ _("重播") }}</a> ·
+            <a href="/admin/shell_log/{{ acc.id }}/{{ l.name }}?view=input" target="_blank">{{ _("輸入文字") }}</a> ·
+            <a href="/admin/shell_log/{{ acc.id }}/{{ l.name }}?view=cast">.cast</a></td></tr>
+        {% endfor %}
+      </table>
+    </details>
+    {% endfor %}
+  </div>
+  {% else %}<p class="muted">{{ _("無") }}</p>{% endif %}
   <p class="muted">{{ _("每次連上終端機會產生一筆紀錄。刪除帳號或題組時，相關紀錄會一併刪除。") }}</p>
 </div>
 <div class="card">

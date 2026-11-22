@@ -669,7 +669,7 @@ async def participant_detail(request: Request, aid: int):
     acts = db.query("SELECT * FROM activity WHERE account_id=? ORDER BY id DESC LIMIT 200", (aid,))
     for r in runs + insts + atts + acts:
         r["set_name"] = names.get(r["set_id"], f"#{r['set_id']}") if r["set_id"] else ""
-    logs = recording.list_for(aid, names)
+    logs = recording.group(recording.list_for(aid, names), runs)
     return _render(request, "admin/participant.html", {"acc": acc, "runs": runs, "insts": insts, "logs": logs,
                                                     "atts": atts, "acts": acts})
 

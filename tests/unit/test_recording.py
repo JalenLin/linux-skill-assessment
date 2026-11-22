@@ -56,6 +56,24 @@ def test_list_and_delete():
     assert recording.list_for(901) == [] and not recording.account_dir(901).exists()
 
 
+def test_group_by_question():
+    rows = [
+        {"set_id": 1, "qid": "b", "set_name": "S", "started": "2026-11-23 10:30:00", "duration": 30.0, "blocked": 0},
+        {"set_id": 1, "qid": "a", "set_name": "S", "started": "2026-11-23 10:20:00", "duration": 60.0, "blocked": 1},
+        {"set_id": 1, "qid": "b", "set_name": "S", "started": "2026-11-23 10:10:00", "duration": 90.0, "blocked": 0},
+    ]
+    runs = [{"set_id": 1, "qid": "b", "status": "done", "score": 4.0, "max_score": 10.0},
+            {"set_id": 1, "qid": "b", "status": "done", "score": 10.0, "max_score": 10.0},
+            {"set_id": 1, "qid": "b", "status": "error", "score": None, "max_score": 10.0},
+            {"set_id": 2, "qid": "b", "status": "done", "score": 1.0, "max_score": 10.0}]
+    g = recording.group(rows, runs)
+    assert [x["qid"] for x in g] == ["b", "a"]                  # 最近作答的題目在前
+    b, a = g
+    assert len(b["sessions"]) == 2 and b["duration"] == 120 and b["checks"] == 2 and (b["best"], b["max"]) == (10, 10)
+    assert b["sessions"][0]["started"] > b["sessions"][1]["started"]
+    assert a["best"] is None and a["checks"] == 0 and a["blocked"] == 1
+
+
 def test_truncated_last_line_is_ignored():
     p = _record(aid=902)
     with open(p, "a", encoding="utf-8") as f:

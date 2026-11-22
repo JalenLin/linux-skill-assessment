@@ -251,8 +251,18 @@ def test_terminal_recording_replay_and_cleanup(admin, person):
 
     page = admin.get(f"/admin/participant/{aid}").text
     names = re.findall(rf'/admin/recording/{aid}/(s{sid}-{Q}-[0-9-]+\.cast)', page)
-    assert len(names) == 1 and "Recording" in page
+    assert len(names) == 1 and "Recording" in page and "未檢查" in page
     name = names[0]
+
+    time.sleep(1.1)                                             # 同一題再連一次＋檢查 → 同一組裡兩筆
+    p.check(sid, Q)
+    term = p.terminal(sid, Q)
+    term.read(until="$ ")
+    term.close()
+    time.sleep(0.5)
+    page = admin.get(f"/admin/participant/{aid}").text
+    assert len(re.findall(rf'/admin/recording/{aid}/s{sid}-{Q}-', page)) == 2
+    assert "2 次" in page and "0/10" in page and "檢查 1 次" in page
 
     cast = admin.get(f"/admin/shell_log/{aid}/{name}?view=cast")
     assert cast.status_code == 200 and "attachment" in cast.headers["content-disposition"]

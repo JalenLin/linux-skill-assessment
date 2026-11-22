@@ -338,5 +338,12 @@
  "輸入文字": "Input text",
  "重播": "Replay",
  "長度": "Length",
- "閒置超過 2 秒的片段會縮短。進度條上的標記是每一行輸入；點右邊的列表可以跳到該時間。": "Idle periods longer than 2 seconds are shortened. Markers on the progress bar are input lines; click an entry in the list to jump to it."
+ "閒置超過 2 秒的片段會縮短。進度條上的標記是每一行輸入；點右邊的列表可以跳到該時間。": "Idle periods longer than 2 seconds are shortened. Markers on the progress bar are input lines; click an entry in the list to jump to it.",
+ "{n} 次": "{n}×",
+ "最近": "Latest",
+ "最高分": "Best score",
+ "未檢查": "Not checked",
+ "檢查 {n} 次": "{n} checks",
+ "總時間": "Total time",
+ "連線次數": "Sessions"
 }

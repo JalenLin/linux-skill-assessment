@@ -125,3 +125,14 @@ body.term-only .lsa-term { height: 100vh; }
 .rec-lines li.now { background: rgba(9, 105, 218, .15); }
 .rec-lines li.blocked { color: var(--bad); }
 @media (max-width: 900px) { .rec-wrap { flex-direction: column; } .rec-lines { flex-basis: auto; width: 100%; max-height: 40vh; } }
+.rec-groups { border-top: 1px solid rgba(127, 127, 127, .25); }
+.rec-groups details { border-bottom: 1px solid rgba(127, 127, 127, .25); }
+.rec-row { display: grid; grid-template-columns: 1.2fr 1.4fr 1.2fr .7fr 1.3fr 1.4fr; gap: 8px; padding: 6px 4px; align-items: center; }
+.rec-head { font-weight: 600; }
+summary.rec-row { cursor: pointer; list-style: none; }
+summary.rec-row::-webkit-details-marker { display: none; }
+summary.rec-row > span:first-child::before { content: "▸ "; }
+details[open] > summary.rec-row > span:first-child::before { content: "▾ "; }
+summary.rec-row:hover { background: rgba(127, 127, 127, .08); }
+.rec-sessions { margin: 0 0 8px 20px; width: calc(100% - 20px); }
+@media (max-width: 700px) { .rec-row { grid-template-columns: 1fr 1fr; } .rec-head { display: none; } }
