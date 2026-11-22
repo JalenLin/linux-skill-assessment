@@ -1,5 +1,7 @@
 # 安裝與部署
 
+> English: [en/INSTALL.md](en/INSTALL.md)
+
 本文從一台空的 Proxmox VE 主機開始，到作答者可以登入測驗為止。
 
 - [1. 硬體與軟體需求](#1-硬體與軟體需求)

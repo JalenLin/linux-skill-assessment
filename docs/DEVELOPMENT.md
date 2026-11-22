@@ -1,5 +1,7 @@
 # 開發
 
+> English: [en/DEVELOPMENT.md](en/DEVELOPMENT.md)
+
 ## 本機開發（不需要 PVE）
 
 `mock` 模式不連 PVE、不跑 Ansible：建立環境只記狀態、建置範本與自我測試直接視為通過、終端機會回顯輸入、檢查預設 0 分（在終端機輸入 `mock-pass` 可讓檢查通過）。

@@ -1,5 +1,7 @@
 # 管理者操作手冊
 
+> English: [en/ADMIN.md](en/ADMIN.md)
+
 後台網址：`http://<lsa-web IP>/admin`，右上角可切換介面語言。
 
 - [基本觀念](#基本觀念)

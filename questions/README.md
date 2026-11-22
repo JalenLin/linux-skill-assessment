@@ -1,5 +1,7 @@
 # 題庫
 
+> English: [README.en.md](README.en.md)
+
 這個資料夾在 repo 裡只放**範例題** [`example-hello`](example-hello)。
 實際的測驗／練習題目含標準解答，請另外管理（例如另一個 private repo），
 再用後台上傳 zip 或 `deploy/push-questions.sh <題庫目錄>` 放進系統。

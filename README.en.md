@@ -11,8 +11,8 @@ and press "Check answer" to be graded automatically by **Ansible**.
 Similar in spirit to [SadServers](https://sadservers.com/), but entirely self-hosted: questions, accounts,
 scores and session recordings stay on your own hardware. Open source (MIT), no cloud account needed.
 
-> The detailed documentation under `docs/` is written in Traditional Chinese. The user interface supports
-> English (and Traditional Chinese; more languages can be added), and questions can be translated too.
+> 中文版：[README.md](README.md). The user interface supports English and Traditional Chinese (more languages
+> can be added), and questions can be translated too.
 
 ## Who it is for
 
@@ -59,6 +59,16 @@ You write your own question packages (YAML + Ansible). One example question is i
  └──────────────────────────────────────────────────────────────────────┘
 ```
 
+## Documentation
+
+| Document | Contents |
+|---|---|
+| [docs/en/INSTALL.md](docs/en/INSTALL.md) | Hardware requirements, installing from scratch (PVE setup, templates, lsa-web), updates, backups |
+| [docs/en/ADMIN.md](docs/en/ADMIN.md) | Administrator guide: accounts, question bank, question sets (assessment / practice), assessment-day workflow, scores and attendance |
+| [docs/en/QUESTIONS.md](docs/en/QUESTIONS.md) | Writing questions: package format, step-by-step walkthrough of the example, translations |
+| [docs/en/OPERATIONS.md](docs/en/OPERATIONS.md) | Capacity planning and load-test results, storage limits, troubleshooting |
+| [docs/en/DEVELOPMENT.md](docs/en/DEVELOPMENT.md) | Local development (no PVE needed), code layout, translations |
+
 ## Quick start
 
 Requires one machine running **Proxmox VE 8 or 9** (the default `local-lvm` storage is fine).
@@ -76,7 +86,7 @@ echo 'PVE=root@<PVE IP>' > deploy/deploy.env
 #    Switch the UI to English (top right), then Question bank → example-hello → "Build template + self-test"
 ```
 
-Set the default UI language to English under System settings. Full steps (in Chinese): [docs/INSTALL.md](docs/INSTALL.md).
+Set the default UI language to English under System settings. Full steps: [docs/en/INSTALL.md](docs/en/INSTALL.md).
 
 ## Sizing (measured)
 
@@ -87,13 +97,13 @@ Intel N305 (8 cores), 48 GB RAM, NVMe, 60 concurrent users, 12 questions (9 LXC,
 - 60 VMs booting at once saturate the CPU for 2–3 minutes; terminals stay responsive (< 0.3 s) during mass grading
 - Default LVM-thin metadata limits a host to roughly 1,100 instances — delete a set's instances when it's over
 
-Details: [docs/OPERATIONS.md](docs/OPERATIONS.md).
+Details: [docs/en/OPERATIONS.md](docs/en/OPERATIONS.md).
 
 ## Writing questions
 
 A question is a folder: `question.yaml` (title, checks, points), `description.md`, `setup.yml` (Ansible: install and break things),
 `check.yml` (Ansible tasks named `check:<id>`), optional `solution.yml` and translations (`description.en.md`, an `i18n:` block).
-Start by copying [`questions/example-hello`](questions/example-hello); see [docs/QUESTIONS.md](docs/QUESTIONS.md).
+Start by copying [`questions/example-hello`](questions/example-hello); see [docs/en/QUESTIONS.md](docs/en/QUESTIONS.md).
 
 Keep your real questions (which contain solutions) in a separate, private repository and load them with
 the admin upload or `deploy/push-questions.sh`.

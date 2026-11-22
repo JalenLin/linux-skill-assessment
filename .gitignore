@@ -18,6 +18,7 @@ old/
 # 題庫另外管理：只保留格式說明與範例題
 questions/*
 !questions/README.md
+!questions/README.en.md
 !questions/example-hello/
 
 # 編輯器

@@ -1,5 +1,7 @@
 # 出題指南
 
+> English: [en/QUESTIONS.md](en/QUESTIONS.md)
+
 一題是一個資料夾（**題目包**），用 YAML 描述題目、用 Ansible playbook 建置環境與評分。
 最快的方式是複製範例題 [`questions/example-hello`](../questions/example-hello) 再修改。
 
@@ -195,6 +197,23 @@ i18n:
       page: "http://<host>:8000/ can be browsed from another computer and shows Hello Lab"
       boot: The hello service is enabled to start at boot
       restart: The page still works after restarting the hello service
+```
+
+**以英文為主要語言、另附中文**也可以：`lang: en`，`title`／`desc`／`description.md` 寫英文，
+中文放在 `i18n: zh-TW:` 與 `description.zh-TW.md`。語言代碼要和介面語言代碼一致（`zh-TW`、`en`），寫 `zh` 不會被採用。
+
+```yaml
+title: The hello service won't start
+lang: en
+checks:
+  - id: page
+    desc: The page shows Hello Lab on port 8000
+    points: 6
+i18n:
+  zh-TW:
+    title: Hello 服務無法啟動
+    checks:
+      page: 8000 port 顯示 Hello Lab
 ```
 
 ## 開發與測試流程

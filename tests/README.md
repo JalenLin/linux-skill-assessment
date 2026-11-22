@@ -1,5 +1,7 @@
 # 測試
 
+> English: [README.en.md](README.en.md)
+
 ```bash
 .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/python -m pytest                 # 單元＋整合測試（mock 模式，不需要 PVE，約 30 秒）
