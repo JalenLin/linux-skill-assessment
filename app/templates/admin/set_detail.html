@@ -1,9 +1,32 @@
 {% extends "admin/base.html" %}
 {% block admin %}
 <p><a href="/admin/sets">← {{ _("題組列表") }}</a> · <a href="/admin?set={{ st.id }}">{{ _("成績") }}</a></p>
-<form method="post" action="/admin/sets/{{ st.id }}">
+{% set pg = progress %}{% set is_assess = st.mode == 'assessment' %}
 <div class="card">
   <h2>{{ st.name }} <span class="tag {{ 'running' if participant_state == 'open' }}">{{ _("作答者端：{state}", state=_(STATE_LABEL[participant_state])) }}</span></h2>
+  <ol class="steps set-steps">
+    <li><b class="{{ 'ok' if pg.settings_ok else 'warn' }}">{{ '✓' if pg.settings_ok else '!' }}</b>
+      <a href="#settings">{{ _("題組設定") }}</a>{{ _("：") }}{{ _(MODES[st.mode]) }}{{ _("，") }}
+      {% if st.start_at or st.end_at %}{{ (st.start_at or '…') | replace('T', ' ') }} ～ {{ (st.end_at or '…') | replace('T', ' ') }}
+      {% elif is_assess %}<span class="warn">{{ _("測驗需要設定開始與結束時間") }}</span>{% else %}{{ _("一直開放") }}{% endif %}</li>
+    <li><b class="{{ 'ok' if pg.n_included else 'muted' }}">{{ '✓' if pg.n_included else '☐' }}</b>
+      <a href="#questions">{{ _("題目") }}</a>{{ _("：") }}{% if pg.n_included %}{{ _("已納入 {n} 題，共 {pts} 分", n=pg.n_included, pts='%g' % total) }}
+      {% if pg.n_unbuilt %}<span class="warn">{{ _("（其中 {n} 題範本未建置）", n=pg.n_unbuilt) }}</span>{% endif %}
+      {% else %}{{ _("還沒有納入題目") }}{% endif %}</li>
+    <li><b class="{{ 'ok' if pg.visible else 'muted' }}">{{ '✓' if pg.visible else '☐' }}</b>
+      <a href="#settings">{{ _("公開") }}</a>{{ _("：") }}{{ _("作答者看得到這個題組") if pg.visible else _("還沒勾選「作答者可見」（目前是草稿）") }}</li>
+    {% if is_assess %}
+    <li><b class="{{ 'ok' if pg.n_expected and pg.n_inst >= pg.n_expected else 'muted' }}">{{ '✓' if pg.n_expected and pg.n_inst >= pg.n_expected else '☐' }}</b>
+      <a href="#env">{{ _("預先建立環境（建議）") }}</a>{{ _("：") }}{{ _("已建立 {n} / {total}", n=pg.n_inst, total=pg.n_expected) }}
+      <span class="muted">{{ _("（已綁定編號的帳號 {a} 個 × 題目 {q} 題）", a=pg.n_bound, q=pg.n_included) }}</span></li>
+    {% endif %}
+    <li><b>→</b> {{ _("開始後到") }} <a href="/admin?set={{ st.id }}">{{ _("成績總覽") }}</a> {{ _("看成績與出席") }}</li>
+  </ol>
+</div>
+
+<form method="post" action="/admin/sets/{{ st.id }}" id="settings-form" data-dirty-label="{{ _("題組設定") }}">
+<div class="card" id="settings">
+  <h2>{{ _("1. 題組設定") }}</h2>
   <div class="grid2">
     <div><label>{{ _("名稱") }}</label><input type="text" name="name" value="{{ st.name }}"></div>
     <div><label>{{ _("類型") }}</label>
@@ -42,73 +65,73 @@
     </div>
     <div><label>{{ _("排序") }}</label><input class="small" type="number" name="sort_order" value="{{ st.sort_order }}"></div>
   </div>
-  <button class="primary" type="submit">{{ _("儲存題組設定") }}</button>
+  <div class="actions"><button class="primary" type="submit">{{ _("儲存題組設定") }}</button>
+    <span class="muted">{{ _("只儲存這一段（名稱、時間、公開、計分方式等），題目在下一段另外儲存。") }}</span></div>
 </div>
 </form>
 
-<div class="card">
-  <h2>{{ _("題目") }} <span class="muted" style="font-size:14px;font-weight:normal">{{ _("已納入的合計 {n} 分", n='%g' % total) }}</span></h2>
-  <p class="muted">{{ _("勾選「納入」並儲存，該題就會出現在這個題組。單題限時 0 = 不限時（在題組開放時間內自由作答）。") }}</p>
+<div class="card" id="questions">
+  <h2>{{ _("2. 題目") }} <span class="muted" style="font-size:14px;font-weight:normal">{{ _("已納入的合計 {n} 分", n='%g' % total) }}</span></h2>
+  <p class="muted">{{ _("勾選「納入」的題目會出現在這個題組。改完按最下面的「儲存題目設定」，整張表一次儲存。單題限時 0 = 不限時（在題組開放時間內自由作答）；次數 0 = 不限。") }}</p>
   {% set fsel = "#set-questions" %}{% set fstate = true %}{% include "admin/_qfilter.html" %}
-  <form id="bulk" method="post" action="/admin/sets/{{ st.id }}/bulk" class="actions" style="margin-top:0">
-    <button class="primary" name="action" value="include">{{ _("納入勾選的題目") }}</button>
-    <button name="action" value="exclude">{{ _("移出勾選的題目") }}</button>
-    <span class="muted">{{ _("移出只是不納入，該題的配分、限時等設定會保留。") }}</span>
-  </form>
-  <table id="set-questions">
-    <tr><th><input type="checkbox" class="qf-all" title="{{ _("全選目前顯示的題目") }}"></th><th>{{ _("題目") }}</th><th>{{ _("範本") }}</th><th>{{ _("設定") }}</th></tr>
+  <div class="actions" style="margin-top:0">
+    <button type="button" id="inc-shown">{{ _("顯示中的題目全部納入") }}</button>
+    <button type="button" id="exc-shown">{{ _("顯示中的題目全部不納入") }}</button>
+  </div>
+  <form method="post" action="/admin/sets/{{ st.id }}/questions" id="questions-form" data-dirty-label="{{ _("題目設定") }}">
+  <table id="set-questions" class="qtable">
+    <tr><th>{{ _("納入") }}</th><th>{{ _("題目") }}</th><th>{{ _("範本") }}</th><th>{{ _("排序") }}</th><th>{{ _("限時（分）") }}</th><th>{{ _("次數") }}</th><th>{{ _("配分") }}</th></tr>
     {% for it in items %}{% set q = it.q %}
     <tr data-q="{{ q.qid }}" data-in="{{ 1 if it.e.enabled else 0 }}" data-tags="{{ q.tags | map('lower') | list | tojson | forceescape }}"
         data-search="{{ (q.qid ~ ' ' ~ q.title ~ ' ' ~ q.title_in() ~ ' ' ~ q.tags | join(' ')) | lower }}">
-      <td><input type="checkbox" class="qf-pick" form="bulk" name="qid" value="{{ q.qid }}"></td>
-      <td><b>{{ q.title_in() }}</b>{% if it.e.enabled %} <span class="tag running">{{ _("已納入") }}</span>{% endif %}<br><span class="muted">{{ q.qid }} · {{ 'LXC' if q.kind == 'lxc' else 'VM' }}{% if it.n_inst %} · {{ _("實例 {n}", n=it.n_inst) }}{% endif %}</span>
+      <td><input type="hidden" name="qid" value="{{ q.qid }}"><input type="checkbox" class="inc" name="inc_{{ q.qid }}" {{ 'checked' if it.e.enabled }} aria-label="{{ _("納入") }}"></td>
+      <td><b>{{ q.title_in() }}</b><br><span class="muted">{{ q.qid }} · {{ 'LXC' if q.kind == 'lxc' else 'VM' }}{% if it.n_inst %} · {{ _("實例 {n}", n=it.n_inst) }}{% endif %}</span>
         {% for t in q.tags %}<a href="#" class="qtag" data-tag="{{ t | lower }}">{{ t }}</a>{% endfor %}</td>
-      <td>{% if it.ready %}<span class="tag running">ready</span>{% else %}<a class="tag" href="/admin/questions">{{ _("未建置") }}</a>{% endif %}</td>
-      <td>
-        <form method="post" action="/admin/sets/{{ st.id }}/q/{{ q.qid }}">
-          <div class="actions" style="align-items:center;margin:0">
-            <label style="margin:0"><input type="checkbox" name="enabled" {{ 'checked' if it.e.enabled }}> {{ _("納入") }}</label>
-            <label style="margin:0">{{ _("排序") }} <input class="small" type="number" name="sort_order" value="{{ it.e.sort_order }}"></label>
-            <label style="margin:0">{{ _("限時") }} <input class="small" type="number" name="time_limit_min" min="0" value="{{ it.e.time_limit_min or 0 }}"> {{ _("分") }}</label>
-            <label style="margin:0" title="{{ _("限時題目可以開始作答的次數，0 = 不限") }}">{{ _("次數") }} <input class="small" type="number" name="max_attempts" min="0" value="{{ it.e.max_attempts or 0 }}"></label>
-            <button class="primary">{{ _("儲存") }}</button>
-          </div>
-          <details><summary class="muted">{{ _("配分 {pts} 分（{n} 項）", pts='%g' % (it.checks | sum(attribute='points')), n=it.checks|length) }}</summary>
-            <table>
-              {% for c in it.checks %}
-              <tr><td><code>{{ c.id }}</code></td><td>{{ q.check_desc(c.id) }}</td>
-                <td class="num muted">{{ _("預設 {n}", n='%g' % q.checks[loop.index0].points) }}</td>
-                <td class="num"><input class="small" type="number" step="0.5" min="0" name="points_{{ c.id }}" value="{{ '%g' % c.points }}"></td></tr>
-              {% endfor %}
-            </table>
-          </details>
-        </form>
-      </td>
+      <td>{% if it.ready %}<span class="tag running">ready</span>{% else %}<a class="tag" href="/admin/questions#q-{{ q.qid }}">{{ _("未建置") }}</a>{% endif %}</td>
+      <td><input class="small" type="number" name="sort_{{ q.qid }}" value="{{ it.e.sort_order }}"></td>
+      <td><input class="small" type="number" name="time_{{ q.qid }}" min="0" value="{{ it.e.time_limit_min or 0 }}"></td>
+      <td><input class="small" type="number" name="att_{{ q.qid }}" min="0" value="{{ it.e.max_attempts or 0 }}" title="{{ _("限時題目可以開始作答的次數，0 = 不限") }}"></td>
+      <td><details><summary class="muted">{{ _("{pts} 分（{n} 項）", pts='%g' % (it.checks | sum(attribute='points')), n=it.checks|length) }}</summary>
+          <table>
+            {% for c in it.checks %}
+            <tr><td><code>{{ c.id }}</code></td><td>{{ q.check_desc(c.id) }}</td>
+              <td class="num muted">{{ _("預設 {n}", n='%g' % q.checks[loop.index0].points) }}</td>
+              <td class="num"><input class="small" type="number" step="0.5" min="0" name="pts_{{ q.qid }}_{{ c.id }}" value="{{ '%g' % c.points }}"></td></tr>
+            {% endfor %}
+          </table>
+        </details></td>
     </tr>
     {% endfor %}
   </table>
+  <div class="actions save-bar"><button class="primary" type="submit">{{ _("儲存題目設定") }}</button>
+    <span class="muted dirty-note" hidden>{{ _("有尚未儲存的修改（標成黃色的列）") }}</span></div>
+  </form>
 </div>
 
-<div class="card">
-  <h2>{{ _("環境") }}</h2>
-  <div class="actions">
-    <form class="inline" method="post" action="/admin/sets/{{ st.id }}/prewarm" onsubmit='return confirm({{ _("為已綁定編號的帳號預先建立本題組所有題目的環境（每個約 7 秒，背景執行）？") | tojson }})'>
-      <button class="primary">{{ _("預先建立實例") }}</button>
-      <label class="inline muted"><input type="checkbox" name="all_accounts"> {{ _("包含尚未綁定編號的帳號") }}</label></form>
-    <form class="inline" method="post" action="/admin/sets/{{ st.id }}/destroy_instances" onsubmit='return confirm({{ _("刪除本題組所有作答者的環境？（成績紀錄保留）") | tojson }})'>
-      <input type="text" name="confirm" placeholder="{{ _("輸入 DELETE") }}" style="width:120px">
-      <button class="danger">{{ _("刪除此題組所有實例") }}</button></form>
-  </div>
-  <p class="muted">{{ _("測驗前建議先預先建立，測驗開始時作答者只需要啟動。練習通常不需要預先建立（第一次開題約 10~30 秒）。") }}
-    {{ _("每個實例佔一個磁碟（LVM），全系統可容納的數量有限：題組結束、成績確定後請刪除該題組的實例。") }}</p>
+<div class="card" id="env">
+  <h2>{{ _("3. 預先建立環境") }} <span class="muted" style="font-size:14px;font-weight:normal">{{ _("測驗前建議；練習通常不需要") }}</span></h2>
+  <p>{{ _("已建立 {n} / {total}", n=progress.n_inst, total=progress.n_expected) }}
+    <span class="muted">{{ _("（已綁定編號的帳號 {a} 個 × 題目 {q} 題）", a=progress.n_bound, q=progress.n_included) }}</span></p>
+  <p class="muted">{{ _("作答者第一次開題時系統會自動建立環境（約 10~30 秒），所以這一步不是必要的。") }}
+    {{ _("測驗時很多人同時開題會排隊，建議在帳號都綁定編號、題目確定之後先建立好，測驗開始時作答者只需要啟動。") }}</p>
+  <form class="actions" method="post" action="/admin/sets/{{ st.id }}/prewarm" onsubmit='return confirm({{ _("為已綁定編號的帳號預先建立本題組所有題目的環境（每個約 7 秒，背景執行）？") | tojson }})'>
+    <button class="primary" {{ 'disabled' if not progress.n_included }}>{{ _("預先建立實例") }}</button>
+    <label class="inline muted"><input type="checkbox" name="all_accounts"> {{ _("包含尚未綁定編號的帳號") }}</label>
+  </form>
 </div>
 
-<div class="card">
-  <h2>{{ _("刪除題組") }}</h2>
-  <form method="post" action="/admin/sets/{{ st.id }}/delete" class="actions" onsubmit='return confirm({{ _("刪除題組與其所有成績紀錄？") | tojson }})'>
+<div class="card danger-zone">
+  <h2>{{ _("危險區") }}</h2>
+  <form class="actions" method="post" action="/admin/sets/{{ st.id }}/destroy_instances" onsubmit='return confirm({{ _("刪除本題組所有作答者的環境？（成績紀錄保留）") | tojson }})'>
+    <input type="text" name="confirm" placeholder="{{ _("輸入 DELETE") }}" style="width:120px">
+    <button class="danger">{{ _("刪除此題組所有實例") }}</button>
+    <span class="muted">{{ _("每個實例佔一個磁碟（LVM），全系統可容納的數量有限：題組結束、成績確定後請刪除該題組的實例。成績紀錄保留。") }}</span>
+  </form>
+  <form class="actions" method="post" action="/admin/sets/{{ st.id }}/delete" onsubmit='return confirm({{ _("刪除題組與其所有成績紀錄？") | tojson }})'>
     <input type="text" name="confirm" placeholder="{{ _("輸入題組名稱確認") }}" style="width:200px">
     <button class="danger">{{ _("刪除題組（含成績紀錄）") }}</button>
   </form>
 </div>
 {% endblock %}
-{% block scripts %}<script src="/static/qfilter.js"></script>{% endblock %}
+{% block scripts %}<script>window.LSA_UNSAVED_OTHER = {{ _("「{what}」還有尚未儲存的修改，這次不會一起儲存。仍要繼續嗎？") | tojson }};</script>
+<script src="/static/qfilter.js"></script><script src="/static/setdetail.js"></script>{% endblock %}

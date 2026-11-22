@@ -3,7 +3,7 @@
 <div class="card">
   <h2>{{ _("開始使用") }}</h2>
   <p>{{ _("還沒有任何題組。成績總覽會顯示題組的成績，請依下列步驟建立第一個題組：") }}</p>
-  {% macro mark(done) %}<b class="{{ 'ok' if done else 'muted' }}">{{ '✓' if done else '○' }}</b>{% endmacro %}
+  {% macro mark(done) %}<b class="{{ 'ok' if done else 'muted' }}">{{ '✓' if done else '☐' }}</b>{% endmacro %}
   <ol class="steps">
     <li>{{ mark(n_ready > 0) }} <a href="/admin/questions">{{ _("題庫") }}</a>{{ _("：每一題按「建置範本＋自我測試」") }}
       <span class="muted">{{ _("（已建置 {ready} / {total} 題）", ready=n_ready, total=n_questions) }}</span></li>

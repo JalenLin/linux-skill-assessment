@@ -28,7 +28,7 @@
 </div>
 
 <div class="card" style="overflow:auto">
-  <h2>{{ _("成績矩陣") }} <span class="muted" style="font-size:14px;font-weight:normal">{{ _("（滿分 {total}；— 表示未檢查；括號為環境狀態）", total='%g' % total) }}</span></h2>
+  <h2>{{ _("成績矩陣") }} <span class="muted" style="font-size:14px;font-weight:normal">{{ _("滿分 {total}；— 未檢查；▶ 環境運作中；■ 環境已停止；… 環境建立中", total='%g' % total) }}</span></h2>
   <table class="matrix">
     <tr><th>{{ _("編號 / 帳號") }}</th><th title="{{ _("開放時間內第一次進入題組／開題／按檢查的時間") }}">{{ _("出席") }}</th>
       {% for q in qs %}<th title="{{ q.title_in() }}">{{ loop.index }}. {{ q.qid }}</th>{% endfor %}
@@ -43,7 +43,7 @@
       {% for c in r.cells %}
         {% set cls = '' if c.score is none else ('full' if c.score >= c.total else ('part' if c.score > 0 else 'zero')) %}
         <td class="{{ cls }}">{{ '—' if c.score is none else '%g' % c.score }}
-          {% if c.inst == 'running' %}<span class="ok" title="{{ _("運作中") }}">●</span>{% elif c.inst %}<span class="muted" title="{{ c.inst }}">○</span>{% endif %}</td>
+          {% if c.inst == 'running' %}<span class="ok" title="{{ _("環境運作中") }}">▶</span>{% elif c.inst == 'creating' %}<span class="warn" title="{{ _("環境建立中") }}">…</span>{% elif c.inst %}<span class="muted" title="{{ _("環境已停止") }}">■</span>{% endif %}</td>
       {% endfor %}
       <td class="num"><b>{{ '%g' % r.got }}</b></td>
     </tr>

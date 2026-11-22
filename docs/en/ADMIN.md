@@ -60,6 +60,18 @@ Participant accounts are **issued in advance**: the administrator generates acco
 
 You can add question sets on the "Question sets (assessment/practice)" page. When adding one, you can **copy the questions and points of an existing question set**. New question sets are hidden by default.
 
+The question set page is laid out top to bottom in the order you set things up:
+
+| Section | What it is for | Saving |
+|---|---|---|
+| Progress | Status of each step: ✓ done, ☐ not done yet, ! needs attention (e.g. an assessment without times, an included question without a built template); click to jump to that section | — |
+| 1. Question set settings | Name, type, times, visibility, scoring, … | "Save set settings" saves only this section |
+| 2. Questions | Which questions are included, order, time limit, attempts, points | "Save question settings" saves the whole table at once |
+| 3. Pre-create environments | Recommended before an assessment; usually not needed for practice | The button runs it directly (in the background) |
+| Danger zone | Delete all instances of this set, delete the set | Requires typing a confirmation |
+
+Changes that are not saved yet are highlighted in yellow; if you press another section's save button or leave the page, you are warned first (each section saves only its own content).
+
 ### Question set settings
 
 | Setting | Description |
@@ -75,13 +87,12 @@ You can add question sets on the "Question sets (assessment/practice)" page. Whe
 
 ### Per-question settings
 
-In the question table at the bottom of the question set page: check "Include" and save, and the question appears in this question set.
+"2. Questions" lists every question in the bank: questions with "Include" ticked appear in this question set. When you are done, press "**Save question settings**" below the table to save the whole table at once.
 
 With many questions:
 
 - Above the table you can filter by **keyword** (question id, title, tags), **tag** (several = must match all) and **included / not included**; clicking a tag on a question also filters by it
-- Tick the boxes on the left (the header box selects all questions currently shown) and press "**Include selected**" or "**Remove selected**" to handle them at once;
-  removing only excludes the question, its points, time limit and other settings are kept
+- After filtering, press "**Include all shown**" or "**Exclude all shown**", then save. Excluded questions keep their points, time limit and other settings
 
 | Field | Description |
 |---|---|
@@ -121,7 +132,7 @@ The attendance column in the Score overview shows the number of IPs; one person 
 
 - [ ] Delete instances of practice question sets that are no longer needed (to free space)
 - [ ] Confirm that all participants have bound their IDs (or prepare to bind them on site)
-- [ ] On the assessment question set page, press "**Prewarm instances**": this creates environments for all questions for accounts already bound to an ID.
+- [ ] On the assessment question set page, under "3. Pre-create environments", press "**Prewarm instances**": this creates environments for all questions for accounts already bound to an ID (the page shows "x / y created").
       **About 8 seconds each; 60 people × 12 questions takes about 1.5 hours**, so do it early. When the assessment starts, participants only need to start them
 - [ ] Keeping "Max running environments per participant" in System settings at **1** is recommended
 - [ ] In the assessment notice, write: only one question can be open at a time, and switching questions pauses the previous one (files are kept); remember to `enable` any service you start manually
@@ -143,7 +154,7 @@ The attendance column in the Score overview shows the number of IPs; one person 
 
 ## Score overview and participant page
 
-- **Score overview**: switch question sets at the top; shows the score matrix (per person, per question), total score, attendance, and running environments; can be exported to CSV
+- **Score overview**: switch question sets at the top; shows the score matrix (per person, per question), total score, attendance, and environment status (▶ running, ■ stopped, … being created); can be exported to CSV
 - **Participant page** (click an ID to open it):
   - Instances: environments and status for each question in each question set
   - Timed attempts: "End now" (and reset the environment), "Reset attempts"

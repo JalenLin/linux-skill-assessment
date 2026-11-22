@@ -447,10 +447,34 @@ def test_tags_edit_filter_and_bulk(admin):
     page = admin.get(f"/admin/sets/{sid}").text
     assert page.count('data-in="1"') == 1
     admin.post(f"/admin/sets/{sid}/bulk", data={"action": "include", "qid": [Q]})
-    assert 'name="time_limit_min" min="0" value="15"' in admin.get(f"/admin/sets/{sid}").text   # 設定保留
+    assert f'name="time_{Q}" min="0" value="15"' in admin.get(f"/admin/sets/{sid}").text   # 設定保留
     assert "請先勾選題目" in flash(admin.post(f"/admin/sets/{sid}/bulk", data={"action": "include"}))
     admin.post(f"/admin/questions/{Q2}/tags", data={"tags": ""})
     admin.delete_set(sid, "Bulk")
+
+
+def test_set_page_progress_and_single_save(admin):
+    """題組頁：上方進度清單反映狀態；題目表整張一次儲存（納入、排序、限時、次數、配分）"""
+    sid = admin.create_set("Steps", "assessment", visible=None)
+    page = admin.get(f"/admin/sets/{sid}").text
+    assert "測驗需要設定開始與結束時間" in page and "還沒有納入題目" in page and "還沒勾選「作答者可見」" in page
+    assert 'id="questions-form"' in page and page.count(">儲存題目設定</button>") == 1
+
+    data = {"qid": [Q, Q2], f"inc_{Q}": "on", f"sort_{Q}": "2", f"time_{Q}": "20", f"att_{Q}": "3",
+            f"pts_{Q}_page": "4", f"pts_{Q}_boot": "2", f"pts_{Q}_restart": "2",
+            f"sort_{Q2}": "1", f"time_{Q2}": "0", f"att_{Q2}": "0"}
+    r = admin.post(f"/admin/sets/{sid}/questions", data=data)
+    assert "納入 1 題" in flash(r) and r.headers["location"].endswith("#questions")
+    page = admin.get(f"/admin/sets/{sid}").text
+    assert "已納入 1 題，共 8 分" in page
+    assert f'name="time_{Q}" min="0" value="20"' in page and f'name="att_{Q}" min="0" value="3"' in page
+    assert f'name="pts_{Q}_page" value="4"' in page
+    assert f'tr data-q="{Q2}" data-in="0"' in page
+
+    admin.save_set(sid, name="Steps", mode="assessment", start_at=t(minutes=60), end_at=t(minutes=120))
+    page = admin.get(f"/admin/sets/{sid}").text
+    assert "測驗需要設定開始與結束時間" not in page and "已建立 0 / " in page
+    admin.delete_set(sid, "Steps")
 
 
 def test_upload_bad_zip(admin):

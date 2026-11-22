@@ -309,9 +309,62 @@ async def set_detail(request: Request, sid: int):
                       "n_inst": db.one("SELECT COUNT(*) n FROM instances WHERE set_id=? AND qid=?",
                                        (sid, q.qid))["n"]})
     items.sort(key=lambda i: (not i["e"]["enabled"], i["e"]["sort_order"], i["q"].qid))
+    included = [i for i in items if i["e"]["enabled"]]
+    n_bound = db.one("SELECT COUNT(*) n FROM accounts WHERE participant_code IS NOT NULL")["n"]
+    n_inst = db.one("SELECT COUNT(*) n FROM instances WHERE set_id=?", (sid,))["n"]
+    times_ok = st["mode"] == "practice" or bool(st["start_at"] and st["end_at"])
+    progress = {
+        "settings_ok": times_ok,
+        "n_included": len(included),
+        "n_unbuilt": sum(1 for i in included if not i["ready"]),
+        "visible": bool(st["visible"]),
+        "n_bound": n_bound,
+        "n_inst": n_inst,
+        "n_expected": n_bound * len(included),
+    }
     return _render(request, "admin/set_detail.html", {
-        "st": st, "items": items, "all_tags": _all_tags(qs.values()), "state": sets.state(st), "participant_state": sets.participant_state(st),
-        "total": sum(sum(c.points for c in i["checks"]) for i in items if i["e"]["enabled"])})
+        "st": st, "items": items, "all_tags": _all_tags(qs.values()), "state": sets.state(st),
+        "participant_state": sets.participant_state(st), "progress": progress,
+        "total": sum(sum(c.points for c in i["checks"]) for i in included)})
+
+
+@router.post("/sets/{sid}/questions")
+async def set_questions_save(request: Request, sid: int):
+    """題目表整張一次儲存：每題的納入、排序、限時、次數、配分"""
+    require_admin(request)
+    if sets.get(sid) is None:
+        return _back("/admin/sets", _("題組不存在"))
+    f = await request.form()
+    qs, _bad = questions.load_all()
+    n_in = 0
+
+    def num(key, cast=int, default=0):
+        v = f.get(key)
+        try:
+            return cast(v) if v not in (None, "") else default
+        except ValueError:
+            return default
+
+    for qid in f.getlist("qid"):
+        q = qs.get(str(qid))
+        if q is None:
+            continue
+        pts = {}
+        for c in q.checks:
+            v = num(f"pts_{qid}_{c.id}", float, None)
+            if v is not None and v >= 0 and v != c.points:
+                pts[c.id] = v
+        on = int(f.get(f"inc_{qid}") == "on")
+        n_in += on
+        db.execute(
+            "INSERT INTO set_questions(set_id,qid,enabled,sort_order,points_json,time_limit_min,max_attempts) "
+            "VALUES(?,?,?,?,?,?,?) "
+            "ON CONFLICT(set_id,qid) DO UPDATE SET enabled=excluded.enabled, sort_order=excluded.sort_order, "
+            "points_json=excluded.points_json, time_limit_min=excluded.time_limit_min, "
+            "max_attempts=excluded.max_attempts",
+            (sid, qid, on, num(f"sort_{qid}"), json.dumps(pts),
+             max(0, num(f"time_{qid}")), max(0, num(f"att_{qid}"))))
+    return _back(f"/admin/sets/{sid}#questions", _("題目設定已儲存（納入 {n} 題）", n=n_in))
 
 
 @router.post("/sets/{sid}")

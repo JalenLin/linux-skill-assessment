@@ -149,3 +149,11 @@ summary.rec-row:hover { background: rgba(127, 127, 127, .08); }
 .qtags-edit details { display: inline-block; margin-left: 6px; vertical-align: middle; }
 .qtags-edit details[open] { display: block; margin-left: 0; }
 [data-q][hidden] { display: none !important; }
+/* 題組頁 */
+.set-steps { margin: 4px 0 0; }
+.set-steps b.warn { color: var(--warn); }
+.qtable tr.dirty td { background: rgba(212, 167, 44, .18); }
+.save-bar { position: sticky; bottom: 0; background: var(--card, #fff); padding: 8px 0; margin-bottom: 0; z-index: 2; }
+button.pulse { box-shadow: 0 0 0 3px rgba(212, 167, 44, .55); }
+.danger-zone { border: 1px solid rgba(207, 34, 46, .35); }
+.danger-zone .actions { align-items: center; }
