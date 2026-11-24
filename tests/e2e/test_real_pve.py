@@ -118,6 +118,19 @@ def test_terminal_recordings(env):
     assert admin.get(f"/admin/recording/{aid}/{names[0]}").status_code == 200
 
 
+def test_console_on_request(env):
+    """按「改用主控台」：SSH 正常也直接連主控台（不經過網路）"""
+    p, sid = env["p"], env["s1"]
+    assert p.api(sid, Q, "start")["ok"]
+    t0 = time.time()
+    term = p.terminal(sid, Q, console=True)
+    try:
+        term.read(until='"forced": true', timeout=30)
+        assert time.time() - t0 < 15                          # 不等 SSH
+    finally:
+        term.close()
+
+
 def test_console_fallback_when_network_broken(env):
     """作答者把網路改壞（eth0 沒有 IP）：重新開終端機會自動改用 PVE 主控台，還能登入修好"""
     p, sid = env["p"], env["s1"]

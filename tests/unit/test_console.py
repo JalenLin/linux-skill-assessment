@@ -90,7 +90,7 @@ def test_fallback_to_console(monkeypatch):
             rec = shell.Recorder(950, 3, "example-hello", 100, 30)
             term = await shell._open_terminal(ws, rec, {"vmid": 10001, "kind": "qemu", "ip": "10.10.0.9"}, 100, 30)
             assert isinstance(term, console.Console)
-            assert {"type": "console"} in ws.sent
+            assert {"type": "console", "forced": False} in ws.sent
             text = b"".join(x for x in ws.sent if isinstance(x, bytes)).decode()
             assert "stty rows 30 cols 100" in text                 # VM 序列主控台的提示
             await term.close()
@@ -108,4 +108,30 @@ def test_fallback_to_console(monkeypatch):
             assert await shell._open_terminal(ws2, rec2, {"vmid": 10001, "kind": "lxc", "ip": "10.10.0.9"}, 100, 30) is None
             assert "refused" in b"".join(x for x in ws2.sent if isinstance(x, bytes)).decode()
             rec2.close()
+    asyncio.run(go())
+
+
+def test_forced_console_skips_ssh(monkeypatch):
+    """作答者按「改用主控台」：不試 SSH、不等待，直接連主控台"""
+    async def go():
+        async with FakeTermproxy() as fake:
+            async def must_not_call(*a, **kw):
+                raise AssertionError("SSH should not be tried")
+
+            class P:
+                def termproxy(self, kind, vmid):
+                    return fake.info
+            monkeypatch.setattr(shell._SSH, "open", must_not_call)
+            monkeypatch.setattr(shell.instances, "wait_ssh", must_not_call)
+            monkeypatch.setattr(shell, "client", lambda: P())
+            ws = FakeWS()
+            rec = shell.Recorder(951, 3, "example-hello", 100, 30)
+            term = await shell._open_terminal(ws, rec, {"vmid": 10002, "kind": "lxc", "ip": "10.10.0.9"},
+                                              100, 30, force_console=True)
+            assert isinstance(term, console.Console)
+            assert {"type": "console", "forced": True} in ws.sent
+            await term.close()
+            rec.close()
+            _, events = read(rec.path)
+            assert ["m", "CONSOLE: requested"] in [e[1:] for e in events]
     asyncio.run(go())

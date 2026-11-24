@@ -5,7 +5,7 @@
   const termOnly = !!window.TERM_ONLY;
   const T = window.TIMING || { timed: false };
   const $ = (id) => document.getElementById(id);
-  const btnCheck = $("btn-check"), btnReset = $("btn-reset"), btnRe = $("btn-reconnect");
+  const btnCheck = $("btn-check"), btnReset = $("btn-reset"), btnRe = $("btn-reconnect"), btnCon = $("btn-console");
   const status = (text, on) => { $("term-status").textContent = text; $("dot").classList.toggle("on", !!on); };
   // 同一題的作答頁與終端機視窗互相通知
   const chan = "BroadcastChannel" in window ? new BroadcastChannel(`lsa-term-${sid}-${qid}`) : null;
@@ -24,6 +24,9 @@
   refit();
 
   let ws = null, pingTimer = null, wanted = true, retries = 0, retryTimer = null;
+  // useConsole：作答者按了「改用主控台」（自動重連也維持主控台）；inConsole：目前連的是主控台
+  let useConsole = false, inConsole = false;
+  const conLabel = () => { if (btnCon) btnCon.textContent = inConsole ? t("改用 SSH") : t("改用主控台"); };
   let popup = null;   // 作答頁開出的終端機視窗
   const enc = new TextEncoder();
 
@@ -43,8 +46,10 @@
   function connect() {
     disconnect();
     wanted = true;
+    inConsole = false;
+    conLabel();
     const proto = location.protocol === "https:" ? "wss" : "ws";
-    const sock = new WebSocket(`${proto}://${location.host}/ws/shell/${sid}/${encodeURIComponent(qid)}?cols=${term.cols}&rows=${term.rows}`);
+    const sock = new WebSocket(`${proto}://${location.host}/ws/shell/${sid}/${encodeURIComponent(qid)}?cols=${term.cols}&rows=${term.rows}${useConsole ? "&console=1" : ""}`);
     ws = sock;
     sock.binaryType = "arraybuffer";
     sock.onopen = () => { status(t("已連線"), true); term.focus(); retries = 0; };
@@ -53,8 +58,10 @@
         try {
           const m = JSON.parse(ev.data);
           if (m.type === "notice") flash(m.text);
-          if (m.type === "console") {  // SSH 連不上，改用主控台
-            status(t("主控台模式（SSH 連不上）"), true);
+          if (m.type === "console") {  // 主控台連線（作答者選的，或 SSH 連不上自動改用）
+            inConsole = true;
+            conLabel();
+            status(m.forced ? t("主控台模式") : t("主控台模式（SSH 連不上）"), true);
             if (btnRe) btnRe.disabled = false;
           }
           if (m.type === "paused") {   // 開了別題，本題環境被暫停：不要自動重連
@@ -113,9 +120,10 @@
     });
   }
 
-  const actionBtns = () => [btnCheck, btnReset, btnRe].filter(Boolean);
+  const actionBtns = () => [btnCheck, btnReset, btnRe, btnCon].filter(Boolean);
 
-  async function start() {
+  async function start(opts) {
+    useConsole = !!(opts && opts.console);
     actionBtns().forEach((b) => (b.disabled = true));
     status(t("準備環境中…第一次開啟約需 10~30 秒"), false);
     term.reset();
@@ -125,6 +133,7 @@
       term.write(`\r\n\x1b[31m${r.error}\x1b[0m\r\n`);
       if (btnReset) btnReset.disabled = false;
       if (btnRe) btnRe.disabled = false;
+      if (btnCon) btnCon.disabled = false;
       return;
     }
     actionBtns().forEach((b) => (b.disabled = false));
@@ -132,6 +141,7 @@
     connect();
   }
   if (btnRe) btnRe.onclick = () => start();
+  if (btnCon) btnCon.onclick = () => start({ console: !inConsole });
 
   // ---------------- 單題限時 ----------------
   let timeUp = false;

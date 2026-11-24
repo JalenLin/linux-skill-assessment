@@ -142,6 +142,12 @@
  "Linux 實作能力檢驗系統": "Linux Skill Assessment System",
  "主控台模式（SSH 連不上）": "Console mode (SSH unreachable)",
  "SSH 連不上（{e}），等待環境回應…": "SSH is unreachable ({e}); waiting for the environment to respond…",
- "SSH 連不上，已改用主控台連線（不經過網路）。登入帳號 {user}，預設密碼 user。把網路或 sshd 修好後，按「重新連線終端機」就會回到一般連線。": "SSH is unreachable, so you are now on the console (it does not go through the network). Log in as {user}; the default password is user. Once the network or sshd is fixed, press \"Reconnect terminal\" to go back to the normal connection.",
- "序列主控台不會自動調整畫面大小，登入後可以執行：stty rows {rows} cols {cols}": "The serial console does not resize automatically; after logging in you can run: stty rows {rows} cols {cols}"
+ "序列主控台不會自動調整畫面大小，登入後可以執行：stty rows {rows} cols {cols}": "The serial console does not resize automatically; after logging in you can run: stty rows {rows} cols {cols}",
+ "SSH 連不上，已改用主控台連線（不經過網路）。登入帳號 {user}，預設密碼 user。把網路或 sshd 修好後，按「改用 SSH」就會回到一般連線。": "SSH is unreachable, so you are now on the console (it does not go through the network). Log in as {user}; the default password is user. Once the network or sshd is fixed, press \"Use SSH\" to return to the normal connection.",
+ "不經過網路連到你的環境（改壞了網路、防火牆或 sshd 時用）": "Connect to your environment without going through the network (use it if you broke the network, firewall or sshd)",
+ "主控台模式": "Console mode",
+ "主控台連線失敗（{e}）。請按「重新連線」，或重置本題。": "The console connection failed ({e}). Press \"Reconnect\", or reset this question.",
+ "主控台連線（不經過網路）。登入帳號 {user}，預設密碼 user。按「改用 SSH」可以回到一般連線。": "Console connection (does not go through the network). Log in as {user}; the default password is user. Press \"Use SSH\" to return to the normal connection.",
+ "改用 SSH": "Use SSH",
+ "改用主控台": "Use console"
 }

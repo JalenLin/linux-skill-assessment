@@ -9,6 +9,7 @@
     <span class="spacer"></span>
     {% if timing.timed %}{{ _("本題剩餘") }} <span class="countdown" id="attempt-left">--:--</span> ·{% endif %}
     {% if seconds_left is not none %}{{ _("開放剩餘") if s.mode == 'practice' else _("測驗剩餘") }} <span class="countdown" id="countdown" data-left="{{ seconds_left }}" data-home="{{ sbase }}">--:--:--</span>{% endif %}
+    <button class="bar-btn" id="btn-console" title="{{ _("不經過網路連到你的環境（改壞了網路、防火牆或 sshd 時用）") }}">{{ _("改用主控台") }}</button>
     <button class="bar-btn" id="btn-reconnect">{{ _("重新連線") }}</button>
   </div>
   <div id="term"></div>

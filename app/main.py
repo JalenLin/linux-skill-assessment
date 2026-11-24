@@ -433,6 +433,7 @@ async def ws_shell(ws: WebSocket, sid: int, qid: str):
     attempts.shell_opened(acc["id"], sid, qid)
     log_activity(ws, acc, sid, "shell", qid)
     try:
-        await shell.serve(ws, acc, inst, still_open, block_paste=bool(s["block_paste"]))
+        await shell.serve(ws, acc, inst, still_open, block_paste=bool(s["block_paste"]),
+                          force_console=ws.query_params.get("console") == "1")
     finally:
         attempts.shell_closed(acc["id"], sid, qid)
