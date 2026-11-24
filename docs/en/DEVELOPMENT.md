@@ -35,7 +35,8 @@ after making changes, deploy to the test machine with `./deploy/deploy.sh`.
 | `app/pve.py` | PVE API wrapper (proxmoxer); `MockPVE` for mock mode |
 | `app/grader.py` | Check queueing and execution (ansible-runner), scoring policies, score calculation |
 | `app/attempts.py` | Per-question time limits and attempt counts |
-| `app/shell.py` | Terminal: WebSocket ↔ SSH (asyncssh), paste blocking |
+| `app/shell.py` | Terminal: WebSocket ↔ SSH (asyncssh), console fallback when SSH is down; paste blocking |
+| `app/console.py` | PVE console (termproxy / vncwebsocket) client |
 | `app/recording.py` | Terminal recordings: asciicast v2 capture, input list, plain-text views, deletion with account/set |
 | `app/security.py` | Password hashing (scrypt) and random passwords; sessions use Starlette SessionMiddleware (signed with `secret_key`) |
 | `app/i18n.py` | Multiple languages |
@@ -48,7 +49,8 @@ after making changes, deploy to the test machine with `./deploy/deploy.sh`.
 
 - **Opening a question**: `POST /api/s/{set}/q/{qid}/start` → `instances.ensure_running`
   (if there is no instance, linked-clone one from the template; if the concurrent running limit is exceeded, first cleanly shut down the least recently used one) → wait until SSH is reachable
-- **Terminal**: `/ws/shell/{set}/{qid}` → `shell.serve` SSHes into the participant environment as `user` with the grading key and relays in both directions
+- **Terminal**: `/ws/shell/{set}/{qid}` → `shell.serve` SSHes into the participant environment as `user` with the grading key and relays in both directions.
+  If SSH is still unreachable after a 10 / 30 second wait, it falls back to the PVE console: the API token calls `termproxy`, then connects to `vncwebsocket` (the token needs VM.Console, which `PVEVMAdmin` includes)
 - **Check**: `POST .../check` → `grader.enqueue` queues it (`grader_concurrency` at a time) → ansible-runner runs
   `check.yml` → pass/fail per item is tallied from task names `check:<id>` → stored in `check_runs`
 - **Scores**: computed from `check_runs` according to the question set's scoring policy (if points change, scores are recalculated with the new points)

@@ -35,7 +35,8 @@ LSA_CONFIG=config.dev.yaml .venv/bin/uvicorn app.main:app --reload --port 8000
 | `app/pve.py` | PVE API 包裝（proxmoxer）；`MockPVE` 給 mock 模式 |
 | `app/grader.py` | 檢查排隊與執行（ansible-runner）、計分政策、成績計算 |
 | `app/attempts.py` | 單題限時與次數 |
-| `app/shell.py` | 終端機：WebSocket ↔ SSH（asyncssh）、禁止貼上 |
+| `app/shell.py` | 終端機：WebSocket ↔ SSH（asyncssh），SSH 不通時改用主控台；禁止貼上 |
+| `app/console.py` | PVE 主控台（termproxy／vncwebsocket）用戶端 |
 | `app/recording.py` | 終端機紀錄：asciicast v2 錄製、輸入列表、純文字檢視、隨帳號／題組刪除 |
 | `app/security.py` | 密碼雜湊（scrypt）與隨機密碼；session 用 Starlette SessionMiddleware（`secret_key` 簽章） |
 | `app/i18n.py` | 多國語言 |
@@ -48,7 +49,8 @@ LSA_CONFIG=config.dev.yaml .venv/bin/uvicorn app.main:app --reload --port 8000
 
 - **開題**：`POST /api/s/{set}/q/{qid}/start` → `instances.ensure_running`
   （沒有實例就從範本 linked clone；超過同時運作上限就先正常關機最久沒用的那個）→ 等 SSH 可連
-- **終端機**：`/ws/shell/{set}/{qid}` → `shell.serve` 用評分金鑰以 `user` SSH 進作答者環境，雙向轉送
+- **終端機**：`/ws/shell/{set}/{qid}` → `shell.serve` 用評分金鑰以 `user` SSH 進作答者環境，雙向轉送。
+  SSH 連不上（等 10／30 秒後仍不通）就改走 PVE 主控台：API token 呼叫 `termproxy`，再連 `vncwebsocket`（token 需要 VM.Console，`PVEVMAdmin` 已包含）
 - **檢查**：`POST .../check` → `grader.enqueue` 排隊（同時 `grader_concurrency` 個）→ ansible-runner 跑
   `check.yml` → 依 task 名稱 `check:<id>` 統計各項通過與否 → 存入 `check_runs`
 - **成績**：依題組計分政策從 `check_runs` 計算（配分改了會依新配分重算）

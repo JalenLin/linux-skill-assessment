@@ -177,8 +177,10 @@ async def _enforce_limit(account_id: int, keep: int | None) -> None:
     await asyncio.gather(*(pause(v) for v in victims))
 
 
-async def ensure_running(account: dict, sid: int, q: Question, enforce_limit: bool = True) -> dict:
-    """確保作答者在這個題組這題的實例存在且運作中，回傳 instance row。"""
+async def ensure_running(account: dict, sid: int, q: Question, enforce_limit: bool = True,
+                         need_ssh: bool = True) -> dict:
+    """確保作答者在這個題組這題的實例存在且運作中，回傳 instance row。
+    need_ssh=False（開終端機）：SSH 沒回應也照樣回傳，終端機會改用主控台連線。"""
     async with _locks[(account["id"], sid, q.qid)]:
         inst = get(account["id"], sid, q.qid)
         pve = client()
@@ -200,7 +202,12 @@ async def ensure_running(account: dict, sid: int, q: Question, enforce_limit: bo
                     raise InstanceError(f"啟動環境失敗: {e}") from e
             set_status(inst["id"], "running")
         touch(inst)
-        if not await wait_ssh(inst["ip"], 180 if inst["kind"] == "qemu" else 60):
+        # 剛開機要等開機完成；本來就在運作、只是開終端機時，SSH 沒回應多半是被改壞了，不用久等（會改用主控台）
+        boot_wait = 180 if inst["kind"] == "qemu" else 60
+        if not await wait_ssh(inst["ip"], boot_wait if (need_ssh or st != "running") else 8):
+            if not need_ssh:
+                log.info("instance %s running but SSH not responding; terminal will use the console", inst["vmid"])
+                return get(account["id"], sid, q.qid)
             raise InstanceError("環境已啟動但 SSH 沒有回應。若你修改過 sshd 或網路設定，請重置本題。")
         return get(account["id"], sid, q.qid)
 

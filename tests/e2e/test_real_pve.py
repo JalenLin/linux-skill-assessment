@@ -116,3 +116,32 @@ def test_terminal_recordings(env):
     outputs = "".join(admin.get(f"/admin/shell_log/{aid}/{n}?view=output").text for n in names)
     assert "keep-me" in outputs
     assert admin.get(f"/admin/recording/{aid}/{names[0]}").status_code == 200
+
+
+def test_console_fallback_when_network_broken(env):
+    """作答者把網路改壞（eth0 沒有 IP）：重新開終端機會自動改用 PVE 主控台，還能登入修好"""
+    p, sid = env["p"], env["s1"]
+    assert p.api(sid, Q, "start")["ok"]
+    term = p.terminal(sid, Q)
+    term.send("sudo ip addr flush dev eth0\r")               # SSH 會跟著斷
+    term.read(timeout=15)
+    term.close()
+
+    t0 = time.time()
+    j = p.api(sid, Q, "start")
+    assert j["ok"], j                                         # SSH 不通也要能開終端機
+    term = p.terminal(sid, Q)
+    try:
+        term.read(until='"console"', timeout=90)
+        assert time.time() - t0 < 90
+        term.send("\r")
+        out = term.read(timeout=5)
+        if "login:" in out:                                   # 主控台 tty 可能還沒登入過
+            term.send("user\r")
+            term.read(until="assword", timeout=15)
+            term.send("user\r")
+            term.read(timeout=8)
+        assert "10.10." not in term.run("ip -4 -br addr show eth0")
+        term.send("sudo reboot\r")                            # 恢復網路，後面的測試與清除不受影響
+    finally:
+        term.close()

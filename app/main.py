@@ -329,7 +329,7 @@ async def api_start(request: Request, sid: int, qid: str):
     attempts.touch(acc["id"], sid, qid)
     log_activity(request, acc, sid, "start", qid)
     try:
-        inst = await instances.ensure_running(acc, sid, q)
+        inst = await instances.ensure_running(acc, sid, q, need_ssh=False)
     except instances.InstanceError as e:
         return api_error(i18n.translate_stored(str(e)), 503)
     attempts.touch(acc["id"], sid, qid)

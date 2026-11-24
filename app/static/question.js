@@ -53,6 +53,10 @@
         try {
           const m = JSON.parse(ev.data);
           if (m.type === "notice") flash(m.text);
+          if (m.type === "console") {  // SSH 連不上，改用主控台
+            status(t("主控台模式（SSH 連不上）"), true);
+            if (btnRe) btnRe.disabled = false;
+          }
           if (m.type === "paused") {   // 開了別題，本題環境被暫停：不要自動重連
             wanted = false;
             status(t("本題環境已暫停（開啟了其他題目）"), false);

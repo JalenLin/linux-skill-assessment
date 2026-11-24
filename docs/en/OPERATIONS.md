@@ -112,7 +112,11 @@ free -m; uptime                                        # memory, load
 **A participant says the terminal won't connect**
 
 - Press "Reconnect" on the question page; if that still fails, have the participant press "Reset environment" (returns to the initial state; their work will be lost)
-- The participant may have broken SSH (sshd configuration, the `user` account, network settings); a reset fixes it
+- If the participant broke the network, firewall or sshd, the terminal **switches to the console automatically** (PVE termproxy, which does not go through the network: a tty for LXC, the serial port for VMs).
+  The status bar shows "Console mode (SSH unreachable)"; they log in as `user` with the default password `user`, fix things, then press "Reconnect" to go back to SSH.
+  Switching takes about 20 seconds (about 40 for VMs); the VM serial console does not resize automatically (the terminal shows the `stty` command to run)
+- If the console does not work either, the `user` account (password, shell) is probably broken or the environment cannot boot; have them reset
+- The replay page marks the moment the terminal switched to the console
 - Check the instance status for that question on the participant's page in the admin console; the "Instances" page lets you stop/start it manually
 
 **A check shows "The grader cannot log in to the environment"**

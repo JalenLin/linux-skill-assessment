@@ -1,4 +1,5 @@
-"""Web shell：瀏覽器 xterm.js <-websocket-> 後端 <-SSH-> 作答者實例。"""
+"""Web shell：瀏覽器 xterm.js <-websocket-> 後端 <-SSH-> 作答者實例。
+SSH 連不上時改走 PVE 主控台（app/console.py），作答者把網路或 sshd 改壞了也還能登入修好。"""
 from __future__ import annotations
 
 import asyncio
@@ -9,6 +10,8 @@ import asyncssh
 from fastapi import WebSocket, WebSocketDisconnect
 
 from . import instances
+from .console import Console
+from .pve import client
 from .recording import Recorder
 from .config import cfg
 from .i18n import _
@@ -33,6 +36,75 @@ def looks_like_paste(data: bytes) -> bool:
     return len(data.decode("utf-8", "replace")) > 3
 
 
+class _SSH:
+    """一般連線：lsa-web 透過管理網路 SSH 進作答者環境"""
+
+    def __init__(self, conn, proc) -> None:
+        self.conn, self.proc = conn, proc
+
+    @classmethod
+    async def open(cls, inst: dict, cols: int, rows: int) -> "_SSH":
+        conn = await asyncssh.connect(
+            inst["ip"], username=cfg.ssh_user, client_keys=[cfg.ssh_key], known_hosts=None,
+            connect_timeout=10, keepalive_interval=10, keepalive_count_max=3)
+        try:
+            proc = await conn.create_process(term_type="xterm-256color", term_size=(cols, rows),
+                                             encoding=None, stderr=asyncssh.STDOUT)
+        except Exception:
+            conn.close()
+            raise
+        return cls(conn, proc)
+
+    async def read(self) -> bytes:
+        return await self.proc.stdout.read(65536)
+
+    async def write(self, data: bytes) -> None:
+        self.proc.stdin.write(data)
+
+    async def resize(self, cols: int, rows: int) -> None:
+        self.proc.change_terminal_size(cols, rows)
+
+    async def close(self) -> None:
+        self.conn.close()
+
+
+async def _open_terminal(ws: WebSocket, rec: Recorder, inst: dict, cols: int, rows: int):
+    """先用 SSH；連不上（作答者改壞了網路、防火牆或 sshd）就改用 PVE 主控台，不經過網路。
+    回傳 None 表示兩種都連不上（訊息已經送出）。"""
+    try:
+        return await _SSH.open(inst, cols, rows)
+    except Exception as e:  # noqa: BLE001
+        err = str(e) or type(e).__name__
+    log.info("ssh to %s failed (%s), waiting before console fallback", inst["vmid"], err)
+    # 剛重開機（例如檢查時重啟）的環境 SSH 還沒起來：先等一下，不要馬上改用主控台
+    await _send_msg(ws, _("SSH 連不上（{e}），等待環境回應…", e=err), rec)
+    if await instances.wait_ssh(inst["ip"], 30 if inst["kind"] == "qemu" else 10):
+        try:
+            return await _SSH.open(inst, cols, rows)
+        except Exception as e:  # noqa: BLE001
+            err = str(e) or type(e).__name__
+    try:
+        info = await asyncio.to_thread(client().termproxy, inst["kind"], inst["vmid"])
+        term = Console(info)
+        await term.open(cols, rows)
+    except Exception as e:  # noqa: BLE001
+        log.warning("console fallback for %s failed: %r", inst["vmid"], e)
+        await _send_msg(ws, _("無法連線到你的環境（{e}）。若改過 sshd / 帳號 {user} / 網路，請重置本題。",
+                              e=err, user=cfg.ssh_user), rec)
+        return None
+    log.info("console fallback for %s", inst["vmid"])
+    rec.mark("CONSOLE: SSH unreachable")
+    msg = _("SSH 連不上，已改用主控台連線（不經過網路）。登入帳號 {user}，預設密碼 user。把網路或 sshd 修好後，按「重新連線終端機」就會回到一般連線。",
+            user=cfg.ssh_user)
+    if inst["kind"] == "qemu":
+        msg += "\r\n" + _("序列主控台不會自動調整畫面大小，登入後可以執行：stty rows {rows} cols {cols}",
+                          rows=rows, cols=cols)
+    await _send_msg(ws, msg, rec)
+    await ws.send_text(json.dumps({"type": "console"}))
+    await term.write(b"\r")          # 讓主控台重新顯示登入提示（或已登入的 shell 提示字元）
+    return term
+
+
 async def serve(ws: WebSocket, account: dict, inst: dict, still_open, block_paste: bool = False) -> None:
     """still_open(): 回傳 None 表示可繼續；回傳字串則顯示訊息並斷線"""
     cols = int(ws.query_params.get("cols", 100))
@@ -46,22 +118,13 @@ async def serve(ws: WebSocket, account: dict, inst: dict, still_open, block_past
         if cfg.mock:
             await _mock(ws, rec, inst, still_open, kicked, block_paste)
             return
-        try:
-            conn = await asyncssh.connect(
-                inst["ip"], username=cfg.ssh_user, client_keys=[cfg.ssh_key],
-                known_hosts=None, connect_timeout=15, keepalive_interval=30)
-        except Exception as e:  # noqa: BLE001
-            await _send_msg(ws, _("無法連線到你的環境（{e}）。若改過 sshd / 帳號 {user} / 網路，請重置本題。",
-                                  e=e, user=cfg.ssh_user), rec)
+        term = await _open_terminal(ws, rec, inst, cols, rows)
+        if term is None:
             return
-        async with conn:
-            proc = await conn.create_process(
-                term_type="xterm-256color", term_size=(cols, rows),
-                encoding=None, stderr=asyncssh.STDOUT)
-
+        try:
             async def pump_out():
                 while True:
-                    data = await proc.stdout.read(65536)
+                    data = await term.read()
                     if not data:
                         break
                     rec.output(data)
@@ -79,11 +142,11 @@ async def serve(ws: WebSocket, account: dict, inst: dict, still_open, block_past
                             await ws.send_text(json.dumps({"type": "notice", "text": _("本次測驗禁止貼上")}))
                             continue
                         rec.input(data)
-                        proc.stdin.write(data)
+                        await term.write(data)
                     elif msg.get("text"):
                         m = json.loads(msg["text"])
                         if m.get("type") == "resize":
-                            proc.change_terminal_size(int(m["cols"]), int(m["rows"]))
+                            await term.resize(int(m["cols"]), int(m["rows"]))
                             rec.resize(m["cols"], m["rows"])
                         elif m.get("type") == "ping":
                             instances.touch(inst)
@@ -109,6 +172,8 @@ async def serve(ws: WebSocket, account: dict, inst: dict, still_open, block_past
             for t in done:
                 if t.exception() and not isinstance(t.exception(), WebSocketDisconnect):
                     log.warning("shell error: %r", t.exception())
+        finally:
+            await term.close()
     finally:
         instances.active_shells[inst["vmid"]] -= 1
         instances.shell_kicks[inst["vmid"]].discard(kicked)
@@ -123,7 +188,6 @@ async def serve(ws: WebSocket, account: dict, inst: dict, still_open, block_past
 async def _mock(ws: WebSocket, rec: Recorder, inst: dict, still_open, kicked: asyncio.Event,
                 block_paste: bool = False) -> None:
     """mock 模式：不連真實環境，輸入會回顯。輸入 `mock-pass [檢查id ...]` 讓之後的檢查通過（測試用）"""
-    from .pve import client
     banner = (_("（MOCK 模式：未連接真實環境，輸入會回顯）") + "\r\n$ ").encode()
     rec.output(banner)
     await ws.send_bytes(banner)

@@ -404,5 +404,6 @@
  "滿分 {total}；— 未檢查；▶ 環境運作中；■ 環境已停止；… 環境建立中": "full marks {total}; — not checked; ▶ environment running; ■ stopped; … being created",
  "環境已停止": "Environment stopped",
  "環境建立中": "Environment being created",
- "環境運作中": "Environment running"
+ "環境運作中": "Environment running",
+ "SSH 連不上，改用主控台": "SSH unreachable, switched to the console"
 }

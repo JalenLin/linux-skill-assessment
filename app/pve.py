@@ -147,6 +147,19 @@ class PVE:
         if isinstance(r, str) and r.startswith("UPID"):
             self.wait(r)
 
+    # ---- 主控台（不經過網路：LXC 是 tty、VM 是序列埠） ----
+    def termproxy(self, kind: str, vmid: int) -> dict:
+        """開一個主控台代理，回傳 websocket 網址、驗證標頭與登入訊息（見 app/console.py）"""
+        from urllib.parse import urlencode
+        r = self._vm(kind, vmid).termproxy.post()
+        q = urlencode({"port": r["port"], "vncticket": r["ticket"]})
+        return {
+            "url": f"wss://{cfg.pve_host}:{cfg.pve_port}/api2/json/nodes/{cfg.pve_node}/{kind}/{vmid}/vncwebsocket?{q}",
+            "headers": {"Authorization": f"PVEAPIToken={cfg.pve_user}!{cfg.pve_token_name}={cfg.pve_token_value}"},
+            "hello": f"{r['user']}:{r['ticket']}\n".encode(),
+            "verify_ssl": cfg.pve_verify_ssl,
+        }
+
 
 class MockPVE:
     """本機開發用：只記狀態，不真的建立容器。"""

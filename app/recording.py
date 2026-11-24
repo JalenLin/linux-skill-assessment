@@ -2,7 +2,7 @@
 
 - 存放：<data>/shell_logs/a<帳號 id>/s<題組 id>-<題目 id>-<YYYYmmdd-HHMMSS>.cast
   （依帳號存放：編號換綁、帳號刪除後重建都不會混在一起）
-- 事件："o" 畫面輸出、"i" 鍵盤輸入、"r" 視窗大小改變、"m" 標記（被擋下的貼上）
+- 事件："o" 畫面輸出、"i" 鍵盤輸入、"r" 視窗大小改變、"m" 標記（被擋下的貼上、改用主控台）
 - 後台用 asciinema-player 重播；另外提供輸入列表（點一下跳到該時間）與純文字檢視
 - 刪除帳號 → 刪掉整個 a<id>/；刪除題組 → 刪掉所有 s<題組 id>-*.cast
 """
@@ -69,6 +69,9 @@ class Recorder:
     def paste_blocked(self, b: bytes) -> None:
         text = b.decode("utf-8", "replace").replace("\x1b[200~", "").replace("\x1b[201~", "")
         self._ev("m", f"{PASTE_LABEL}: {text[:500]}")
+
+    def mark(self, text: str) -> None:
+        self._ev("m", text)
 
     def close(self) -> None:
         if self.f.closed:
