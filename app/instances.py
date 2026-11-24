@@ -203,8 +203,13 @@ async def ensure_running(account: dict, sid: int, q: Question, enforce_limit: bo
             set_status(inst["id"], "running")
         touch(inst)
         # 剛開機要等開機完成；本來就在運作、只是開終端機時，SSH 沒回應多半是被改壞了，不用久等（會改用主控台）
+        # terminal: console／console-only 的題目 SSH 不通是常態：開終端機不等 SSH，檢查也只短暫等一下
         boot_wait = 180 if inst["kind"] == "qemu" else 60
-        if not await wait_ssh(inst["ip"], boot_wait if (need_ssh or st != "running") else 8):
+        if q.terminal_default == "console":
+            wait = 0 if not need_ssh else (boot_wait if st != "running" else 15)
+        else:
+            wait = boot_wait if (need_ssh or st != "running") else 8
+        if wait and not await wait_ssh(inst["ip"], wait):
             if not need_ssh:
                 log.info("instance %s running but SSH not responding; terminal will use the console", inst["vmid"])
                 return get(account["id"], sid, q.qid)

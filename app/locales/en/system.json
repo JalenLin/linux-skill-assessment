@@ -31,5 +31,9 @@
  "不是有效的 zip 檔": "Not a valid zip file",
  "zip 內含不安全的路徑: {n}": "Unsafe path in zip: {n}",
  "zip 內找不到 question.yaml": "question.yaml not found in zip",
- "題目 id 不合法: {qid}（只能小寫英數與 -，或在 question.yaml 設定 id）": "Invalid question id: {qid} (lowercase letters, digits and - only, or set id in question.yaml)"
+ "題目 id 不合法: {qid}（只能小寫英數與 -，或在 question.yaml 設定 id）": "Invalid question id: {qid} (lowercase letters, digits and - only, or set id in question.yaml)",
+ "初始狀態 SSH 不通，無法自動套用 solution.yml；請用主控台手動驗證解答": "SSH is unreachable in the initial state, so solution.yml cannot be applied automatically; verify the solution manually on the console",
+ "⚠ 初始狀態 SSH 不通，無法自動套用 solution.yml；請用主控台手動驗證解答": "⚠ SSH is unreachable in the initial state, so solution.yml cannot be applied automatically; verify the solution manually on the console",
+ "terminal 必須是 ssh、console、ssh-only 或 console-only": "terminal must be ssh, console, ssh-only or console-only",
+ "初始狀態 SSH 不通（terminal: console／console-only）：未修正狀態以 0 分計": "SSH is unreachable in the initial state (terminal: console / console-only): the unfixed state counts as 0 points"
 }

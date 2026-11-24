@@ -5,7 +5,7 @@
   const termOnly = !!window.TERM_ONLY;
   const T = window.TIMING || { timed: false };
   const $ = (id) => document.getElementById(id);
-  const btnCheck = $("btn-check"), btnReset = $("btn-reset"), btnRe = $("btn-reconnect"), btnCon = $("btn-console");
+  const btnCheck = $("btn-check"), btnReset = $("btn-reset"), btnRe = $("btn-reconnect"), btnCon = window.TERM_SWITCH === false ? null : $("btn-console");
   const status = (text, on) => { $("term-status").textContent = text; $("dot").classList.toggle("on", !!on); };
   // 同一題的作答頁與終端機視窗互相通知
   const chan = "BroadcastChannel" in window ? new BroadcastChannel(`lsa-term-${sid}-${qid}`) : null;
@@ -25,7 +25,8 @@
 
   let ws = null, pingTimer = null, wanted = true, retries = 0, retryTimer = null;
   // useConsole：作答者按了「改用主控台」（自動重連也維持主控台）；inConsole：目前連的是主控台
-  let useConsole = false, inConsole = false;
+  const consoleDefault = window.TERM_DEFAULT === "console";   // 題目設定 terminal: console
+  let useConsole = consoleDefault, inConsole = false;
   const conLabel = () => { if (btnCon) btnCon.textContent = inConsole ? t("改用 SSH") : t("改用主控台"); };
   let popup = null;   // 作答頁開出的終端機視窗
   const enc = new TextEncoder();
@@ -49,7 +50,7 @@
     inConsole = false;
     conLabel();
     const proto = location.protocol === "https:" ? "wss" : "ws";
-    const sock = new WebSocket(`${proto}://${location.host}/ws/shell/${sid}/${encodeURIComponent(qid)}?cols=${term.cols}&rows=${term.rows}${useConsole ? "&console=1" : ""}`);
+    const sock = new WebSocket(`${proto}://${location.host}/ws/shell/${sid}/${encodeURIComponent(qid)}?cols=${term.cols}&rows=${term.rows}&console=${useConsole ? 1 : 0}`);
     ws = sock;
     sock.binaryType = "arraybuffer";
     sock.onopen = () => { status(t("已連線"), true); term.focus(); retries = 0; };
@@ -123,7 +124,7 @@
   const actionBtns = () => [btnCheck, btnReset, btnRe, btnCon].filter(Boolean);
 
   async function start(opts) {
-    useConsole = !!(opts && opts.console);
+    useConsole = opts && "console" in opts ? !!opts.console : consoleDefault;
     actionBtns().forEach((b) => (b.disabled = true));
     status(t("準備環境中…第一次開啟約需 10~30 秒"), false);
     term.reset();

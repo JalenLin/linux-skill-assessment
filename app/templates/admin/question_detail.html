@@ -9,8 +9,9 @@
     {% if building %}<span class="tag building">{{ _("進行中…") }}</span> <a href="">{{ _("重新整理") }}</a>{% endif %}
   </div>
   {% if selftest %}
-    <p>{{ _("自我測試 {at}：", at=selftest.at) }}{% if selftest.ok %}<b class="ok">{{ _("通過") }}</b>{% else %}<b class="bad">{{ _("未通過") }}</b>{% endif %}
+    <p>{{ _("自我測試 {at}：", at=selftest.at) }}{% if selftest.ok and selftest.partial %}<b class="warn">{{ _("部分通過") }}</b>{% elif selftest.ok %}<b class="ok">{{ _("通過") }}</b>{% else %}<b class="bad">{{ _("未通過") }}</b>{% endif %}
       {% if selftest.error %}<span class="bad">{{ tr_stored(selftest.error) }}</span>{% endif %}</p>
+    {% if selftest.note %}<p class="warn">⚠ {{ tr_stored(selftest.note) }}</p>{% endif %}
     <div class="grid2">
       <div><b>{{ _("未修正狀態") }}</b>{{ _("（應為 0 分）：") }}{{ selftest.broken_score }} / {{ selftest.total }}
         {% for i in selftest.broken_items or [] %}<div class="result-item"><span>{{ '✅' if i.passed else '❌' }} {{ q.check_desc(i.id) if i.id else i.desc }}</span></div>{% endfor %}</div>

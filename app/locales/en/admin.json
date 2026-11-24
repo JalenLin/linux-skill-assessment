@@ -406,5 +406,7 @@
  "環境建立中": "Environment being created",
  "環境運作中": "Environment running",
  "SSH 連不上，改用主控台": "SSH unreachable, switched to the console",
- "作答者改用主控台": "Participant switched to the console"
+ "作答者改用主控台": "Participant switched to the console",
+ "部分通過": "Partially passed",
+ "未修正為 0 分；解答需用主控台手動驗證": "Scores 0 before fixing; verify the solution manually on the console"
 }

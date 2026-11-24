@@ -149,5 +149,6 @@
  "主控台連線失敗（{e}）。請按「重新連線」，或重置本題。": "The console connection failed ({e}). Press \"Reconnect\", or reset this question.",
  "主控台連線（不經過網路）。登入帳號 {user}，預設密碼 user。按「改用 SSH」可以回到一般連線。": "Console connection (does not go through the network). Log in as {user}; the default password is user. Press \"Use SSH\" to return to the normal connection.",
  "改用 SSH": "Use SSH",
- "改用主控台": "Use console"
+ "改用主控台": "Use console",
+ "本題使用主控台連線（不經過網路）。登入帳號 {user}，預設密碼 user。": "This question uses the console (it does not go through the network). Log in as {user}; the default password is user."
 }

@@ -404,6 +404,15 @@ async def api_runs(request: Request, sid: int, qid: str):
             "policy": s["score_policy"], "timing": attempts.status(acc["id"], sid, qid)}
 
 
+def _wants_console(ws: WebSocket, q) -> bool:
+    """console=1／0：作答者按了「改用主控台／改用 SSH」；沒給、或題目不允許切換（-only），就照題目的 terminal 設定。
+    在伺服器端決定：作答者自己改網址也換不了不允許的方式。"""
+    v = ws.query_params.get("console")
+    if q.terminal_switchable and v in ("0", "1"):
+        return v == "1"
+    return q.terminal_default == "console"
+
+
 @app.websocket("/ws/shell/{sid}/{qid}")
 async def ws_shell(ws: WebSocket, sid: int, qid: str):
     try:
@@ -434,6 +443,7 @@ async def ws_shell(ws: WebSocket, sid: int, qid: str):
     log_activity(ws, acc, sid, "shell", qid)
     try:
         await shell.serve(ws, acc, inst, still_open, block_paste=bool(s["block_paste"]),
-                          force_console=ws.query_params.get("console") == "1")
+                          force_console=_wants_console(ws, q), allow_console=q.terminal != "ssh-only",
+                          switchable=q.terminal_switchable)
     finally:
         attempts.shell_closed(acc["id"], sid, qid)

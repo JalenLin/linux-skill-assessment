@@ -163,14 +163,30 @@ def selftest_sync(q: Question, out: _Log | None = None) -> dict:
         pve.clone(q.kind, tmpl["vmid"], vmid, q.hostname, f"lsa selftest q={q.qid}")
         pve.set_network(q.kind, vmid, ip)
         pve.start(q.kind, vmid)
-        _wait_ssh_sync(ip, 240 if q.kind == "qemu" else 90)
-        rr = run_playbook(q.path, "check.yml", ip)
-        s0, total, items0 = score_of(q, rr.results)
-        result.update(broken_score=s0, total=total, broken_items=items0, broken_status=rr.status)
-        out(f"未修正狀態得分：{s0}/{total}（{rr.status}）")
+        ssh_ok = True
+        try:
+            _wait_ssh_sync(ip, 240 if q.kind == "qemu" else 90)
+        except BuildError:
+            if q.terminal_default != "console":
+                raise
+            ssh_ok = False      # terminal: console／console-only 的題目：初始狀態本來就可能 SSH 不通
+        if ssh_ok:
+            rr = run_playbook(q.path, "check.yml", ip)
+            s0, total, items0 = score_of(q, rr.results)
+            status0 = rr.status
+        else:
+            s0, total, items0 = score_of(q, {})
+            status0 = "unreachable"
+            out("初始狀態 SSH 不通（terminal: console／console-only）：未修正狀態以 0 分計")
+        result.update(broken_score=s0, total=total, broken_items=items0, broken_status=status0)
+        out(f"未修正狀態得分：{s0}/{total}（{status0}）")
         if s0 > 0:
             out("⚠ 未修正時就有得分，請確認 check.yml 是否正確")
-        if q.has_solution:
+        if q.has_solution and not ssh_ok:
+            result["partial"] = True    # 只驗證了「未修正為 0 分」；解答要出題者用主控台手動驗證
+            result["note"] = "初始狀態 SSH 不通，無法自動套用 solution.yml；請用主控台手動驗證解答"
+            out("⚠ " + result["note"])
+        elif q.has_solution:
             sr = run_playbook(q.path, "solution.yml", ip, timeout=900)
             out(sr.stdout)
             rr = run_playbook(q.path, "check.yml", ip)
@@ -179,7 +195,7 @@ def selftest_sync(q: Question, out: _Log | None = None) -> dict:
             out(f"套用 solution 後得分：{s1}/{total}")
             if s1 < total:
                 out("⚠ 套用解答後未達滿分，請確認 check.yml / solution.yml")
-        result["ok"] = s0 == 0 and (not q.has_solution or result.get("solved_score") == total)
+        result["ok"] = s0 == 0 and (not q.has_solution or not ssh_ok or result.get("solved_score") == total)
     except Exception as e:
         result.update(ok=False, error=str(e))
         out(f"自我測試失敗：{e}")

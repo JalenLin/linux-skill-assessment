@@ -1,5 +1,6 @@
 """題目包載入、驗證、zip"""
 import io
+import re
 import shutil
 import zipfile
 
@@ -117,3 +118,25 @@ def test_install_and_export_zip_roundtrip(unit_dir):
     assert questions.get("zip-hello").errors == []
     with zipfile.ZipFile(io.BytesIO(questions.export_zip("zip-hello"))) as z:
         assert "zip-hello/question.yaml" in z.namelist()
+
+
+def test_terminal_option(tmp_path):
+    import shutil
+    from conftest import EXAMPLE
+    from app.questions import load_one as load_question
+    d = tmp_path / "con-q"
+    shutil.copytree(EXAMPLE, d)
+    q = load_question(d)
+    assert q.terminal == "ssh" and not q.errors
+    y = d / "question.yaml"
+    y.write_text(y.read_text().replace("# terminal: console", "terminal: Console"))
+    q2 = load_question(d)
+    assert q2.terminal == "console" and not q2.errors
+    assert q2.build_version == q.build_version              # 不影響範本，不用重建
+    assert (q2.terminal_default, q2.terminal_switchable) == ("console", True)
+    for mode, default, switch in (("console-only", "console", False), ("ssh-only", "ssh", False), ("ssh", "ssh", True)):
+        y.write_text(re.sub(r"terminal: \S+", f"terminal: {mode}", y.read_text()))
+        q3 = load_question(d)
+        assert (q3.terminal, q3.terminal_default, q3.terminal_switchable) == (mode, default, switch), mode
+    y.write_text(re.sub(r"terminal: \S+", "terminal: none", y.read_text()))    # none 只給群組題的節點用
+    assert any("terminal" in e for e in load_question(d).errors)

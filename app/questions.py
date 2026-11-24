@@ -42,6 +42,10 @@ class Check:
     points: float
 
 
+# 終端機連線方式：預設 ssh；console 開頭的預設用主控台；-only 不能切換（ssh-only 連不上也不改用主控台）
+TERMINAL_MODES = ("ssh", "console", "ssh-only", "console-only")
+
+
 @dataclass
 class Question:
     qid: str
@@ -59,6 +63,17 @@ class Question:
     # 其他語言：{代碼: {"title": str, "checks": {id: desc}, "description_md": str}}
     translations: dict[str, dict] = field(default_factory=dict)
     tags: list[str] = field(default_factory=list)   # 分類標籤（只給管理者篩選用，作答者看不到）
+    terminal: str = "ssh"          # 終端機連線：ssh / console / ssh-only / console-only（見 TERMINAL_MODES）
+
+    @property
+    def terminal_default(self) -> str:
+        """一開終端機用哪一種：ssh 或 console"""
+        return "console" if self.terminal.startswith("console") else "ssh"
+
+    @property
+    def terminal_switchable(self) -> bool:
+        """作答者可以「改用主控台／改用 SSH」（SSH 不通時也會自動改用主控台）"""
+        return self.terminal in ("ssh", "console")
 
     @property
     def description_html(self) -> str:
@@ -128,6 +143,10 @@ def load_one(qdir: Path) -> Question:
         checks.append(Check(cid, str(c.get("desc", cid)), float(c.get("points", 0))))
     if not checks:
         errors.append("沒有定義 checks")
+    terminal = str(meta.get("terminal") or "ssh").strip().lower()
+    if terminal not in TERMINAL_MODES:
+        errors.append("terminal 必須是 ssh、console、ssh-only 或 console-only")
+        terminal = "ssh"
     tags, tag_err = parse_tags(meta.get("tags"))
     if tag_err:
         errors.append(tag_err)
@@ -168,6 +187,7 @@ def load_one(qdir: Path) -> Question:
         lang=main_lang,
         translations=translations,
         tags=tags,
+        terminal=terminal,
     )
 
 

@@ -135,3 +135,40 @@ def test_forced_console_skips_ssh(monkeypatch):
             _, events = read(rec.path)
             assert ["m", "CONSOLE: requested"] in [e[1:] for e in events]
     asyncio.run(go())
+
+
+def test_terminal_mode_enforced_on_server():
+    """-only 的題目：作答者改網址（console=0/1）也換不了方式"""
+    from types import SimpleNamespace
+    from app.main import _wants_console
+    from app.questions import Question
+
+    def q(mode):
+        return Question(qid="x", title="x", kind="lxc", hostname="h", resources={}, checks=[], description_md="",
+                        path=None, has_solution=False, build_version="", terminal=mode)
+
+    def ws(v=None):
+        return SimpleNamespace(query_params={} if v is None else {"console": v})
+    assert [_wants_console(ws(v), q("ssh")) for v in (None, "0", "1")] == [False, False, True]
+    assert [_wants_console(ws(v), q("console")) for v in (None, "0", "1")] == [True, False, True]
+    assert [_wants_console(ws(v), q("console-only")) for v in (None, "0", "1")] == [True, True, True]
+    assert [_wants_console(ws(v), q("ssh-only")) for v in (None, "0", "1")] == [False, False, False]
+
+
+def test_ssh_only_has_no_console_fallback(monkeypatch):
+    async def go():
+        async def no_ssh(*a, **kw):
+            raise ConnectionRefusedError("refused")
+
+        class P:
+            def termproxy(self, kind, vmid):
+                raise AssertionError("console must not be used for ssh-only")
+        monkeypatch.setattr(shell._SSH, "open", no_ssh)
+        monkeypatch.setattr(shell, "client", lambda: P())
+        ws = FakeWS()
+        rec = shell.Recorder(952, 3, "example-hello", 100, 30)
+        assert await shell._open_terminal(ws, rec, {"vmid": 10003, "kind": "lxc", "ip": "10.10.0.9"}, 100, 30,
+                                          allow_console=False, switchable=False) is None
+        assert "refused" in b"".join(x for x in ws.sent if isinstance(x, bytes)).decode()
+        rec.close()
+    asyncio.run(go())

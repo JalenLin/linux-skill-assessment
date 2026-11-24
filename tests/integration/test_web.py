@@ -480,3 +480,25 @@ def test_set_page_progress_and_single_save(admin):
 def test_upload_bad_zip(admin):
     r = admin.post("/admin/questions/upload", files={"file": ("x.zip", b"not a zip", "application/zip")})
     assert "上傳失敗" in flash(r)
+
+
+def test_partial_selftest_shown(admin, tmp_path_factory):
+    """terminal: console 題目初始 SSH 不通：自我測試只驗證未修正 0 分，後台顯示「部分通過」"""
+    import json
+    import sqlite3
+    db = next(tmp_path_factory.getbasetemp().glob("lsa-server*/data/lsa.db"))
+    result = {"at": "2026-11-25T00:00:00", "broken_score": 0.0, "total": 10.0, "broken_items": [],
+              "broken_status": "unreachable", "partial": True, "ok": True,
+              "note": "初始狀態 SSH 不通，無法自動套用 solution.yml；請用主控台手動驗證解答"}
+    con = sqlite3.connect(db)
+    old = con.execute("SELECT selftest_json FROM templates WHERE qid=?", (Q2,)).fetchone()[0]
+    con.execute("UPDATE templates SET selftest_json=? WHERE qid=?", (json.dumps(result, ensure_ascii=False), Q2))
+    con.commit()
+    try:
+        assert "部分通過" in admin.get("/admin/questions").text
+        page = admin.get(f"/admin/questions/{Q2}").text
+        assert "部分通過" in page and "手動驗證" in page
+    finally:
+        con.execute("UPDATE templates SET selftest_json=? WHERE qid=?", (old, Q2))
+        con.commit()
+        con.close()

@@ -89,6 +89,20 @@ i18n:                # optional: other languages (see "Multiple languages")
 - `tags` (optional): category tags, used only by administrators to filter on the question bank and question set pages; participants never see them. They can also be edited on the admin question bank page (which rewrites this file)
 - The `desc` of each check is the check-item description participants see (when the question set setting "Participants can see whether each check item passed" is on)
 - VM questions can have extra disks: add `extra_disks: [2]` under `resources` (in GB; they become `/dev/sdb`, `/dev/sdc`, … in order)
+- `terminal` (optional): how the participant's terminal connects to the environment
+
+  | Value | Meaning |
+  |---|---|
+  | `ssh` (default) | SSH; participants can press "Use console", and it switches to the console automatically when SSH is unreachable |
+  | `console` | Starts on the PVE console (does not go through the network; log in as `user` / `user`); participants can press "Use SSH" |
+  | `console-only` | Console only, no "Use SSH" (for example to simulate "only the console is available" in a server room) |
+  | `ssh-only` | SSH only; no console fallback when it is unreachable (participants who break it have to reset) |
+
+  Use `console` or `console-only` when the question itself leaves SSH unreachable (for example "fix sshd", "broken network settings", "the firewall blocks everything").
+  The restriction is enforced on the server; participants cannot get around it by editing the URL.
+  - **Checks still use SSH**: until the participant fixes it, a check scores 0 ("cannot connect to the environment"), which is the right result for this kind of question
+  - **If SSH is unreachable in the initial state, the self-test cannot apply solution.yml automatically**: the unfixed state counts as 0 points and the admin pages show "Partially passed"; verify the solution once with a test account: fix it on the console, press check and confirm full marks (once after writing or changing the question)
+  - Do not make the question change eth0's IP address: the platform assigns it from the VMID, and checks and SSH depend on it
 
 ## setup.yml: building the template and planting faults
 
@@ -173,6 +187,7 @@ Rules:
 2. Apply solution.yml and run check.yml again; it **should get full marks**
 
 Only when both hold does it show that the self-test passed, which lets you catch mistakes in check.yml before an assessment.
+(For `terminal: console` / `console-only` questions whose initial state blocks SSH, only step 1 runs; see `terminal` above.)
 You can also press "Self-test only" (without rebuilding the template).
 
 ## LXC or VM?

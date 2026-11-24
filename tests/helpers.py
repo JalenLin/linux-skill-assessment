@@ -136,17 +136,18 @@ class Participant:
                 return r
         raise TimeoutError("check")
 
-    def terminal(self, sid: int, qid: str, console: bool = False) -> "Terminal":
+    def terminal(self, sid: int, qid: str, console: bool | None = None) -> "Terminal":
         return Terminal(self, sid, qid, console)
 
 
 class Terminal:
     """同步操作 web 終端機（底下用 websockets，在自己的 event loop 跑）"""
 
-    def __init__(self, p: Participant, sid: int, qid: str, console: bool = False):
+    def __init__(self, p: Participant, sid: int, qid: str, console: bool | None = None):
+        """console：None = 照題目設定；True／False = 按了「改用主控台／改用 SSH」"""
         self.loop = asyncio.new_event_loop()
         ck = "; ".join(f"{k}={v}" for k, v in p.s.cookies.items())
-        url = p.base.replace("http", "ws", 1) + f"/ws/shell/{sid}/{qid}?cols=120&rows=30" + ("&console=1" if console else "")
+        url = p.base.replace("http", "ws", 1) + f"/ws/shell/{sid}/{qid}?cols=120&rows=30" + ("" if console is None else f"&console={int(console)}")
         self.ws = self.loop.run_until_complete(
             websockets.connect(url, additional_headers={"Cookie": ck}, open_timeout=120, max_size=None))
         self.texts: list[str] = []     # 伺服器的控制訊息（JSON 字串）

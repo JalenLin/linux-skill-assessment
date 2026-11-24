@@ -8,6 +8,7 @@ resources:
   cores: 1
   memory: 512        # MB; 1024 recommended for vm questions
 lang: en             # language of the main content (title, description.md, checks desc); default zh-TW
+# terminal: console  # optional: ssh (default) / console / ssh-only / console-only — see docs/en/QUESTIONS.md
 checks:              # check items; points can be adjusted per question set in the admin UI, these are defaults
   - id: page
     desc: "http://<host>:8000/ can be browsed from another computer and shows Hello Lab"
