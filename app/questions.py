@@ -7,11 +7,15 @@ questions/<qid>/
   check.yml         校驗 playbook；task 名稱以 "check:<id>" 開頭對應檢查項目
   solution.yml      (選用) 標準解答，供自我測試
   files/            (選用) setup 使用的檔案
+
+多節點題（環境組）：question.yaml 寫 networks（題目網路，每個一個 VLAN）與 nodes（每台機器），
+見 docs/QUESTIONS.md「多節點題」。
 """
 from __future__ import annotations
 
 import hashlib
 import io
+import ipaddress
 import json
 import re
 import shutil
@@ -44,6 +48,44 @@ class Check:
 
 # 終端機連線方式：預設 ssh；console 開頭的預設用主控台；-only 不能切換（ssh-only 連不上也不改用主控台）
 TERMINAL_MODES = ("ssh", "console", "ssh-only", "console-only")
+# 多節點題的節點另外可以用 none：不顯示分頁（只能從別台經題目網路連過去）
+NODE_TERMINAL_MODES = TERMINAL_MODES + ("none",)
+NODE_RE = re.compile(r"^[a-z][a-z0-9-]{0,14}$")      # 節點名稱 = 主機名稱 = Ansible host
+NET_RE = re.compile(r"^[a-z][a-z0-9_]{0,14}$")
+KINDS = {"lxc": "lxc", "container": "lxc", "vm": "qemu", "qemu": "qemu"}
+MAX_NODES = 8
+MAX_NETWORKS = 4                                      # 每組最多幾個題目網路（VLAN）
+
+
+def terminal_default_of(mode: str) -> str:
+    return "console" if mode.startswith("console") else "ssh"
+
+
+def terminal_switchable_of(mode: str) -> bool:
+    return mode in ("ssh", "console")
+
+
+@dataclass
+class Node:
+    """多節點題的一台機器：eth0 是管理網路（終端機、評分），eth1… 依 nics 接到題目網路"""
+    name: str
+    kind: str                      # lxc / qemu
+    resources: dict
+    nics: dict[str, str | None]    # {網路名稱: "192.168.50.11/24" 或 None（不設 IP）}，寫的順序 → eth1、eth2…
+    terminal: str = "ssh"          # ssh / console / ssh-only / console-only / none
+    role: str = ""                 # grader：評分用，作答者看不到；平常關機，按「檢查」時才開機
+
+    @property
+    def is_grader(self) -> bool:
+        return self.role == "grader"
+
+    @property
+    def terminal_default(self) -> str:
+        return terminal_default_of(self.terminal)
+
+    @property
+    def terminal_switchable(self) -> bool:
+        return terminal_switchable_of(self.terminal)
 
 
 @dataclass
@@ -64,16 +106,33 @@ class Question:
     translations: dict[str, dict] = field(default_factory=dict)
     tags: list[str] = field(default_factory=list)   # 分類標籤（只給管理者篩選用，作答者看不到）
     terminal: str = "ssh"          # 終端機連線：ssh / console / ssh-only / console-only（見 TERMINAL_MODES）
+    # 多節點題：題目網路 {名稱: {"cidr": "192.168.50.0/24", "gateway": "192.168.50.1" 或 None}} 與節點（依 yaml 順序）
+    networks: dict[str, dict] = field(default_factory=dict)
+    nodes: list[Node] = field(default_factory=list)
 
     @property
     def terminal_default(self) -> str:
         """一開終端機用哪一種：ssh 或 console"""
-        return "console" if self.terminal.startswith("console") else "ssh"
+        return terminal_default_of(self.terminal)
 
     @property
     def terminal_switchable(self) -> bool:
         """作答者可以「改用主控台／改用 SSH」（SSH 不通時也會自動改用主控台）"""
-        return self.terminal in ("ssh", "console")
+        return terminal_switchable_of(self.terminal)
+
+    @property
+    def is_group(self) -> bool:
+        return bool(self.nodes)
+
+    def node(self, name: str) -> Node | None:
+        return next((n for n in self.nodes if n.name == name), None)
+
+    def terminal_tabs(self) -> list[dict]:
+        """作答頁的終端機分頁（單機題只有一個、沒有名稱）"""
+        if not self.nodes:
+            return [{"name": "", "default": self.terminal_default, "switch": self.terminal_switchable}]
+        return [{"name": n.name, "default": n.terminal_default, "switch": n.terminal_switchable}
+                for n in self.nodes if n.terminal != "none"]
 
     @property
     def description_html(self) -> str:
@@ -111,7 +170,8 @@ class Question:
 
 def _build_version(qdir: Path, meta: dict) -> str:
     h = hashlib.sha256()
-    h.update(json.dumps({k: meta.get(k) for k in ("type", "resources", "hostname")}, sort_keys=True).encode())
+    h.update(json.dumps({k: meta.get(k) for k in ("type", "resources", "hostname", "networks", "nodes")},
+                        sort_keys=True, default=str).encode())
     paths = [qdir / "setup.yml"]
     if (qdir / "files").is_dir():
         paths += sorted(p for p in (qdir / "files").rglob("*") if p.is_file())
@@ -128,7 +188,7 @@ def load_one(qdir: Path) -> Question:
         if not (qdir / f).is_file():
             raise QuestionError(f"{qid}: 缺少 {f}")
     meta = yaml.safe_load((qdir / "question.yaml").read_text()) or {}
-    kind = {"lxc": "lxc", "container": "lxc", "vm": "qemu", "qemu": "qemu"}.get(meta.get("type", "lxc"))
+    kind = KINDS.get(meta.get("type", "lxc"))
     if kind is None:
         errors.append("type 必須是 lxc 或 vm")
         kind = "lxc"
@@ -147,6 +207,8 @@ def load_one(qdir: Path) -> Question:
     if terminal not in TERMINAL_MODES:
         errors.append("terminal 必須是 ssh、console、ssh-only 或 console-only")
         terminal = "ssh"
+    resources = {"cores": 1, "memory": 512 if kind == "lxc" else 1024, "swap": 256, **(meta.get("resources") or {})}
+    networks, nodes = _parse_group(meta, kind, resources, terminal, errors)
     tags, tag_err = parse_tags(meta.get("tags"))
     if tag_err:
         errors.append(tag_err)
@@ -176,8 +238,7 @@ def load_one(qdir: Path) -> Question:
         title=str(meta.get("title", qid)),
         kind=kind,
         hostname=str(meta.get("hostname", "server")),
-        resources={"cores": 1, "memory": 512 if kind == "lxc" else 1024, "swap": 256,
-                   **(meta.get("resources") or {})},
+        resources=resources,
         checks=checks,
         description_md=(qdir / "description.md").read_text(),
         path=qdir,
@@ -188,7 +249,133 @@ def load_one(qdir: Path) -> Question:
         translations=translations,
         tags=tags,
         terminal=terminal,
+        networks=networks,
+        nodes=nodes,
     )
+
+
+NODE_KEYS = {"type", "cores", "memory", "swap", "disk", "nics", "terminal", "role"}
+NET_KEYS = {"cidr", "gateway"}
+
+
+def _parse_group(meta: dict, kind: str, resources: dict, terminal: str,
+                 errors: list[str]) -> tuple[dict[str, dict], list[Node]]:
+    """networks / nodes（多節點題）。節點沒寫的 type、cores／memory／swap、terminal 用題目頂層的設定"""
+    raw_nets, raw_nodes = meta.get("networks"), meta.get("nodes")
+    if raw_nets is None and raw_nodes is None:
+        return {}, []
+    if not isinstance(raw_nodes, dict) or not raw_nodes:
+        errors.append("nodes 必須是「節點名稱: 設定」的對應表")
+        return {}, []
+    if "hostname" in meta:
+        errors.append("多節點題不用 hostname：每台的主機名稱就是節點名稱")
+    networks: dict[str, dict] = {}
+    if raw_nets is not None and not isinstance(raw_nets, dict):
+        errors.append("networks 必須是「網路名稱: 設定」的對應表")
+        raw_nets = {}
+    for name, n in (raw_nets or {}).items():
+        name = str(name)
+        n = n or {}
+        if not NET_RE.match(name):
+            errors.append(f"網路名稱不合法：{name!r}（小寫英文開頭，最多 15 字）")
+            continue
+        if not isinstance(n, dict) or set(n) - NET_KEYS:
+            errors.append(f"networks.{name} 只能有 cidr、gateway")
+            continue
+        cidr = None
+        if n.get("cidr") is not None:                  # 不給 cidr：節點在這個網路上不預設 IP（作答者自己設）
+            try:
+                cidr = ipaddress.ip_network(str(n["cidr"]), strict=True)
+                if cidr.version != 4:
+                    raise ValueError
+            except ValueError:
+                errors.append(f"networks.{name}.cidr 必須是 IPv4 網段，例如 192.168.50.0/24")
+                continue
+            if cidr.overlaps(ipaddress.ip_network("10.10.0.0/16")):
+                errors.append(f"networks.{name}.cidr 不能與管理網路 10.10.0.0/16 重疊")
+                continue
+        gw = n.get("gateway")
+        if gw is not None:
+            try:
+                if cidr is None or ipaddress.ip_address(str(gw)) not in cidr:
+                    raise ValueError
+            except ValueError:
+                errors.append(f"networks.{name}.gateway 必須是 {cidr or 'cidr'} 內的位址")
+                gw = None
+        networks[name] = {"cidr": str(cidr) if cidr else None, "gateway": str(gw) if gw is not None else None}
+    if len(networks) > MAX_NETWORKS:
+        errors.append(f"題目網路最多 {MAX_NETWORKS} 個")
+    if len(raw_nodes) > MAX_NODES:
+        errors.append(f"節點最多 {MAX_NODES} 台")
+    nodes: list[Node] = []
+    used_ips: set[str] = set()
+    for name, n in raw_nodes.items():
+        name = str(name)
+        n = n or {}
+        if not NODE_RE.match(name):
+            errors.append(f"節點名稱不合法：{name!r}（小寫英文開頭、英數與 -，最多 15 字）")
+            continue
+        if not isinstance(n, dict):
+            errors.append(f"nodes.{name} 格式錯誤")
+            continue
+        for k in sorted(set(n) - NODE_KEYS):
+            errors.append(f"nodes.{name}.resources：節點直接寫 cores、memory、swap、disk" if k == "resources"
+                          else f"nodes.{name} 不認得的設定：{k}")
+        nkind = KINDS.get(n.get("type"), None) if n.get("type") else kind
+        if nkind is None:
+            errors.append(f"nodes.{name}.type 必須是 lxc 或 vm")
+            nkind = kind
+        res = {**resources, **{k: n[k] for k in ("cores", "memory", "swap", "disk") if k in n}}
+        if nkind != kind and "memory" not in n:
+            res["memory"] = 512 if nkind == "lxc" else 1024
+        role = str(n.get("role") or "").strip().lower()
+        if role not in ("", "grader"):
+            errors.append(f"nodes.{name}.role 只能是 grader")
+            role = ""
+        if role == "grader":
+            if str(n.get("terminal") or "none").lower() != "none":
+                errors.append(f"nodes.{name}：grader 節點不提供終端機（terminal 只能是 none）")
+            if nkind != "lxc":
+                errors.append(f"nodes.{name}：grader 節點必須是 lxc（每次檢查才開機，VM 太慢）")
+        nterm = "none" if role == "grader" else str(n.get("terminal") or terminal).strip().lower()
+        if nterm not in NODE_TERMINAL_MODES:
+            errors.append(f"nodes.{name}.terminal 必須是 ssh、console、ssh-only、console-only 或 none")
+            nterm = "ssh"
+        nics: dict[str, str | None] = {}
+        raw_nics = n.get("nics") or {}
+        if not isinstance(raw_nics, dict):
+            errors.append(f"nodes.{name}.nics 必須是「網路名稱: IP」的對應表")
+            raw_nics = {}
+        for net, ip in raw_nics.items():          # 寫的順序就是 eth1、eth2…
+            net = str(net)
+            if net not in networks:
+                errors.append(f"nodes.{name}.nics：沒有定義網路 {net!r}")
+                continue
+            if ip is None:                         # 接上這個網路但不設 IP
+                nics[net] = None
+                continue
+            if networks[net]["cidr"] is None:
+                errors.append(f"nodes.{name}.nics.{net}：這個網路沒有 cidr，不能指定 IP（要不設 IP 請寫 ~）")
+                continue
+            cidr = ipaddress.ip_network(networks[net]["cidr"])
+            try:
+                addr = ipaddress.ip_address(str(ip))
+                if addr not in cidr or addr in (cidr.network_address, cidr.broadcast_address):
+                    raise ValueError
+            except ValueError:
+                errors.append(f"nodes.{name}.nics.{net}：{ip!r} 不是 {cidr} 內可用的位址")
+                continue
+            if str(addr) in used_ips:
+                errors.append(f"nodes.{name}.nics.{net}：IP {addr} 重複")
+                continue
+            used_ips.add(str(addr))
+            nics[net] = f"{addr}/{cidr.prefixlen}"
+        nodes.append(Node(name=name, kind=nkind, resources=res, nics=nics, terminal=nterm, role=role))
+    if nodes and all(n.is_grader for n in nodes):
+        errors.append("至少要有一台不是 grader 的節點")
+    elif nodes and all(n.terminal == "none" for n in nodes):
+        errors.append("至少要有一台節點可以開終端機（terminal 不是 none）")
+    return networks, nodes
 
 
 # ---------------- 標籤 ----------------

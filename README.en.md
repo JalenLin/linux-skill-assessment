@@ -27,6 +27,7 @@ You write your own question packages (YAML + Ansible). One example question is i
 
 - **One environment per person per question** — linked clones that are ready in seconds, network-isolated, no internet
 - **Browser terminal** (xterm.js) — nothing to install; can pop out into its own window; optional paste blocking; if the participant breaks the network or sshd it switches to the console automatically, no reset needed
+- **Multi-node questions** — several machines per question (e.g. a k8s cluster), each group on its own VLAN question network, one terminal tab per machine
 - **Automatic grading** — several checks per question with partial credit, verified from outside the environment where possible
 - **Question sets** for assessments and practice — each with its own questions, points, time window and scoring policy;
   practice sets pause automatically while an assessment is running

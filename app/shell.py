@@ -128,8 +128,12 @@ async def serve(ws: WebSocket, account: dict, inst: dict, still_open, block_past
     """still_open(): 回傳 None 表示可繼續；回傳字串則顯示訊息並斷線"""
     cols = int(ws.query_params.get("cols", 100))
     rows = int(ws.query_params.get("rows", 30))
+    node = inst.get("node") or ""
     rec = Recorder(account["id"], inst["set_id"], inst["qid"], cols, rows,
-                   title=f"{account.get('participant_code') or account.get('username')} · {inst['qid']}")
+                   title=f"{account.get('participant_code') or account.get('username')} · {inst['qid']}"
+                         + (f" · {node}" if node else ""))
+    if node:
+        rec.mark(f"NODE: {node}")
     instances.active_shells[inst["vmid"]] += 1
     kicked = asyncio.Event()
     instances.shell_kicks[inst["vmid"]].add(kicked)

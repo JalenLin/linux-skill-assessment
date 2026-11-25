@@ -72,7 +72,7 @@ There is usually still plenty of disk space (linked clones are very space-effici
 **Countermeasures:**
 
 1. **Pre-create only for accounts already bound to an ID** (the default)
-2. The **"System-wide instance limit"** in "System settings" (default 1000) is checked before pre-creating
+2. The **"System-wide instance limit"** in "System settings" (default 1000) is checked before pre-creating; it counts machines, so a multi-node group counts as its number of nodes
 3. The "Question set" list shows the current total number of instances; **once a question set has ended and scores are final, delete that question set's instances** (scores are kept)
 4. Check current usage:
    ```bash

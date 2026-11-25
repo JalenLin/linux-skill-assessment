@@ -1,0 +1,29 @@
+# Example multi-node question: a small kubeadm cluster (1 control plane + 2 workers), one VM per node.
+# Each node gets eth0 (management: terminal and grading, don't touch) plus one NIC per entry in `nics`
+# (eth1, eth2… in the order of `networks`). Every participant's group has its own VLAN per network, so
+# all groups can use the same IPs and hostnames — the cluster is built once in the template.
+# See docs/en/QUESTIONS.md "Multi-node questions".
+title: Worker w2 is NotReady (example multi-node question)
+tags: [kubernetes, multi-node, example]
+type: vm             # default for nodes; a node can override it with type: lxc
+lang: en
+networks:            # question networks; each one is a separate VLAN (a switch) per participant
+  lab: {cidr: 192.168.50.0/24, gateway: 192.168.50.1}   # gateway: optional default route (need not exist)
+nodes:               # node name = hostname = Ansible host name; one terminal tab per node
+  cp1: {nics: {lab: 192.168.50.11}, cores: 2, memory: 2560, disk: 16}
+  w1:  {nics: {lab: 192.168.50.21}, cores: 2, memory: 1536, disk: 16}
+  w2:  {nics: {lab: 192.168.50.22}, cores: 2, memory: 1536, disk: 16}
+  # a node can also set terminal: ssh / console / ssh-only / console-only / none (no tab)
+checks:
+  - id: w2-ready
+    desc: Node w2 is Ready
+    points: 6
+  - id: web-scaled
+    desc: Deployment web runs 3 ready replicas
+    points: 4
+i18n:
+  zh-TW:
+    title: 工作節點 w2 NotReady（多節點範例題）
+    checks:
+      w2-ready: 節點 w2 為 Ready
+      web-scaled: Deployment web 有 3 個就緒的副本

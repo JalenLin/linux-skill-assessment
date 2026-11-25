@@ -12,6 +12,7 @@ The fastest way to start is to copy the example question [`questions/example-hel
 - [check.yml: grading](#checkyml-grading)
 - [solution.yml: reference solution and self-test](#solutionyml-reference-solution-and-self-test)
 - [LXC or VM?](#lxc-or-vm)
+- [Multi-node questions](#multi-node-questions)
 - [Multiple languages](#multiple-languages)
 - [Development and testing workflow](#development-and-testing-workflow)
 - [Tips for writing questions](#tips-for-writing-questions)
@@ -200,6 +201,74 @@ You can also press "Self-test only" (without rebuilding the template).
 
 **Use LXC whenever you can.** Many VM questions consume far more memory and CPU (see [OPERATIONS.md](OPERATIONS.md)).
 LXC containers are unprivileged + nesting, so they can run Docker.
+
+## Multi-node questions
+
+A question can consist of several machines; each participant gets a whole group. Examples:
+
+- [`questions/example-net`](../../questions/example-net): 3 LXC containers, two networks and a router (routing, firewall), about 0.3GB per group
+- [`questions/example-k8s`](../../questions/example-k8s): a kubeadm cluster on 3 VMs, about 5.5GB per group
+
+```yaml
+type: vm                 # default node type; a node can set type: lxc
+networks:                # question networks: each one is a separate VLAN (a switch) per group
+  lab: {cidr: 192.168.50.0/24, gateway: 192.168.50.1}   # gateway is optional: a default route (need not exist)
+nodes:                   # node name = hostname = Ansible host name = terminal tab name
+  cp1: {nics: {lab: 192.168.50.11}, cores: 2, memory: 2560, disk: 16}
+  w1:  {nics: {lab: 192.168.50.21}}
+  db:  {type: lxc, nics: {lab: 192.168.50.30}, terminal: none}
+```
+
+| Node field | Meaning |
+|---|---|
+| `type` | `lxc` or `vm`; defaults to the question's `type` |
+| `cores` / `memory` / `swap` | default to the question's `resources` |
+| `disk` | grow the root disk to this many GB (optional) |
+| `nics` | `{network: IP}`; they become eth1, eth2… **in the order written**. An IP of `~` attaches the network without an address (participants set it) |
+| `terminal` | `ssh` / `console` / `ssh-only` / `console-only` (as for single-machine questions), or `none`: no tab, reachable only from another node over the question network |
+| `role` | `grader`: a node used only for grading (see below); must be LXC |
+
+Each entry in `networks`: `cidr` (optional; a network without cidr can only be attached, not given IPs) and `gateway`
+(optional: the default route of nodes on that network; a node whose IP is the gateway, e.g. a router, gets no default
+route; a node on several networks uses the first one with a gateway). Unknown or misspelled fields (`nic:`, `resources:`…)
+show up as errors on the question bank page; multi-node questions don't use `hostname`.
+
+Networking:
+
+- **eth0 is the management network** (terminal and grading use it); don't change it or block it. Write firewall rules
+  by interface (`iifname eth1 ...`): Linux also answers for eth0's IP on eth1, so rules on the destination IP alone don't block it
+- Each group's question networks are its own VLANs, so **every group uses the same IPs and hostnames** and the whole
+  environment (e.g. a kubeadm cluster) is built once in the templates and simply keeps working in the clones
+- Participants can't reach another group by adding VLAN sub-interfaces on eth1 (PVE only lets that port carry its
+  VLAN); eth0 keeps only the management VLAN as well
+- At most 8 nodes and 4 question networks
+- **On LXC nodes PVE manages eth1… and rewrites it at every start** (`/etc/systemd/network/eth*.network`): for questions
+  where participants change IP settings, or faults planted in the IP configuration, use VM nodes (cloud-init configures
+  them on the first boot only and keeps the participant's changes afterwards)
+- Nodes with `terminal: none`: participants reach them from another node, so prepare a way to log in (e.g. SSH keys) in
+  setup.yml; the base sshd only accepts keys
+- The PVE host needs a VLAN-aware vmbr1: on older installs run `deploy/pve-setup.sh network` again on PVE (existing questions are not affected)
+
+Ansible:
+
+- The inventory has one host per node (named after the node), so you can use `hosts: cp1`, `hosts: all:!cp1`
+- Per-host variables: `target_ip` (management IP), `node_ip` (IP on the first question network); all nodes:
+  `lsa_nodes` (`{name: {mgmt_ip, ips: {network: IP}}}`)
+- During the build eth0 has internet access (the default route uses eth0); the networks' `gateway` is added when the
+  templates are made. Participant environments are offline, so install packages and images in setup.yml
+- If one node is unreachable over SSH during a check, that node's items fail and the other nodes are graded normally
+
+**Grader nodes** (`role: grader`): invisible to participants, no participant account, and **powered off except while a
+check runs** (started when "Check answer" is pressed, shut down afterwards). check.yml uses `hosts: grader` to test the
+other nodes from there (ping, curl, connection tests), so it checks the effect seen from outside and participants can't
+fool it by replacing curl, sysctl and the like on their own machines. Each check takes about 5 seconds longer; a group
+has one more LXC (about 50MB, one LV). Example: `example-net` tests the web page from the grader and makes sure the
+firewall on web still blocks other ports (so "accept everything" doesn't pass).
+
+Participants: the terminal has one tab per machine; switching tabs keeps the other connections open, and each recorded session is labelled with its node.
+
+Note: memory adds up over all nodes (the example k8s question needs about 5.5GB per group), so these suit interviews and
+small classes. LXC nodes can't load kernel modules (bonding, wireguard…), and STP and LACP frames don't pass PVE's bridge.
 
 ## Multiple languages
 

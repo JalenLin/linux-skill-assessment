@@ -69,7 +69,18 @@ body.work { height: 100vh; display: flex; flex-direction: column; overflow: hidd
   gap: 12px; align-items: center; }
 .lsa-term .bar .dot { width: 9px; height: 9px; border-radius: 50%; background: #888; }
 .lsa-term .bar .dot.on { background: #3fb950; }
-#term { flex: 1; padding: 6px; min-height: 0; }
+#term { flex: 1; padding: 6px; min-height: 0; position: relative; }
+.term-pane { position: absolute; inset: 6px; }
+.term-pane[hidden] { display: none; }
+/* 多節點題：每台機器一個分頁 */
+.term-tabs { display: flex; gap: 2px; background: #252526; padding: 4px 8px 0; overflow-x: auto; }
+.term-tabs[hidden] { display: none; }
+.term-tab { background: #2d2d2d; color: #aaa; border: 0; border-radius: 4px 4px 0 0; padding: 4px 14px; font-size: 13px;
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.term-tab:hover { color: #ddd; }
+.term-tab.active { background: #1e1e1e; color: #fff; }
+.term-tab .dot { width: 7px; height: 7px; border-radius: 50%; background: #666; }
+.term-tab.on .dot { background: #3fb950; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
 .result-item { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; }
 .runs { font-size: 14px; }

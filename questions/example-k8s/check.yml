@@ -1,0 +1,35 @@
+# Grading runs against all nodes' management IPs; here everything is checked from cp1 with kubectl.
+- hosts: cp1
+  gather_facts: false
+  ignore_errors: true          # keep checking the other items after one fails
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tasks:
+    - name: Wait for the API server (the cluster may have just booted)
+      ansible.builtin.command: kubectl get --raw /readyz
+      register: ready
+      until: ready.rc == 0
+      retries: 36
+      delay: 5
+      changed_when: false
+
+    # Ready alone is not enough right after a cold start: the control plane keeps the last status for ~40 s.
+    # The kubelet also renews its lease every ~10 s, so a recent renewTime proves it is really running.
+    - name: "check:w2-ready node w2 is Ready and its kubelet is alive"
+      ansible.builtin.shell: |
+        kubectl wait --for=condition=Ready node/w2 --timeout=20s >/dev/null || exit 1
+        renew=$(kubectl get lease -n kube-node-lease w2 -o jsonpath='{.spec.renewTime}')
+        [ $(( $(date +%s) - $(date -d "$renew" +%s) )) -lt 60 ]
+      register: w2
+      until: w2.rc == 0
+      retries: 6
+      delay: 5
+      changed_when: false
+
+    - name: "check:web-scaled deployment web has 3 ready replicas"
+      ansible.builtin.command: kubectl get deployment web -o jsonpath={.spec.replicas}/{.status.readyReplicas}
+      register: web
+      until: web.stdout == "3/3"
+      retries: 6
+      delay: 5
+      changed_when: false

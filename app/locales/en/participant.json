@@ -150,5 +150,7 @@
  "主控台連線（不經過網路）。登入帳號 {user}，預設密碼 user。按「改用 SSH」可以回到一般連線。": "Console connection (does not go through the network). Log in as {user}; the default password is user. Press \"Use SSH\" to return to the normal connection.",
  "改用 SSH": "Use SSH",
  "改用主控台": "Use console",
- "本題使用主控台連線（不經過網路）。登入帳號 {user}，預設密碼 user。": "This question uses the console (it does not go through the network). Log in as {user}; the default password is user."
+ "本題使用主控台連線（不經過網路）。登入帳號 {user}，預設密碼 user。": "This question uses the console (it does not go through the network). Log in as {user}; the default password is user.",
+ "這台機器不提供終端機。": "This machine does not offer a terminal.",
+ "評分程式無法登入部分機器（root SSH 被修改？）—那幾台的項目以 0 分計，可重置本題": "The grader cannot log in to some machines (root SSH changed?). Their items score 0; you can reset the question."
 }

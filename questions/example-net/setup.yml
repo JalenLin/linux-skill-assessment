@@ -1,0 +1,57 @@
+# Runs once when the template is built, with internet access (eth0 is NATed during the build).
+# The inventory has one host per node (pc1, r1, web); node_ip = the node's IP on its first question network.
+# Note: on LXC nodes PVE rewrites the eth1… settings (/etc/systemd/network/eth*.network) at every start,
+# so don't plant faults in the IP configuration of LXC nodes — use VM nodes for that.
+- name: Tools on every node
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Packages
+      ansible.builtin.apt:
+        name: [tcpdump, traceroute, nftables]
+        update_cache: true
+
+- name: Router
+  hosts: r1
+  gather_facts: false
+  tasks:
+    - name: "Fault 1: forwarding is switched off at boot"
+      ansible.builtin.copy:
+        dest: /etc/sysctl.d/60-router.conf
+        content: "net.ipv4.ip_forward = 0\n"
+        mode: "0644"
+
+- name: Web server
+  hosts: web
+  gather_facts: false
+  tasks:
+    - name: nginx
+      ansible.builtin.apt:
+        name: nginx-light
+    - name: Page
+      ansible.builtin.copy:
+        dest: /var/www/html/index.html
+        content: "Hello DMZ\n"
+        mode: "0644"
+    - name: "Fault 2: the firewall only lets the DMZ itself reach port 80"
+      ansible.builtin.copy:
+        dest: /etc/nftables.conf
+        mode: "0755"
+        content: |
+          #!/usr/sbin/nft -f
+          flush ruleset
+          table inet filter {
+            chain input {
+              type filter hook input priority filter; policy drop;
+              iif lo accept
+              iifname "eth0" accept          # management network: never block it (grading uses it)
+              ct state established,related accept
+              icmp type echo-request accept
+              iifname "eth1" ip saddr 172.16.0.0/24 tcp dport 80 accept
+            }
+          }
+    - name: Firewall on at boot
+      ansible.builtin.systemd_service:
+        name: nftables
+        enabled: true
+        state: restarted

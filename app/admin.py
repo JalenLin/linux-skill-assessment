@@ -479,8 +479,9 @@ async def set_prewarm(request: Request, sid: int):
     total = len(accs) * len(qs)
     have = {(r["account_id"], r["qid"]) for r in
             db.query("SELECT account_id, qid FROM instances WHERE set_id=?", (sid,))}
-    new = sum(1 for a in accs for q in qs if (a["id"], q.qid) not in have)
-    cur = db.one("SELECT COUNT(*) n FROM instances")["n"]
+    # 以機器數計（儲存的限制是 LV 數）：多節點題一組算節點數
+    new = sum(max(1, len(q.nodes)) for a in accs for q in qs if (a["id"], q.qid) not in have)
+    cur = instances.machine_count()
     limit = int(db.get_setting("max_instances") or 1000)
     if cur + new > limit:
         return _back(f"/admin/sets/{sid}", _(
@@ -635,8 +636,11 @@ async def question_delete(request: Request, qid: str):
     t = db.one("SELECT * FROM templates WHERE qid=?", (qid,))
     if t and t.get("vmid"):
         from .pve import client
-        await asyncio.to_thread(client().destroy, t["kind"], t["vmid"])
+        tnodes = list(instances.template_nodes(qid).values()) or [t]
+        for tn in tnodes:
+            await asyncio.to_thread(client().destroy, tn["kind"], tn["vmid"])
     db.execute("DELETE FROM templates WHERE qid=?", (qid,))
+    db.execute("DELETE FROM template_nodes WHERE qid=?", (qid,))
     db.execute("DELETE FROM set_questions WHERE qid=?", (qid,))
     backup = cfg.data_path / "question_backups"
     backup.mkdir(exist_ok=True)
@@ -845,7 +849,8 @@ async def instances_page(request: Request):
                     "JOIN accounts a ON a.id=i.account_id LEFT JOIN qsets s ON s.id=i.set_id "
                     "ORDER BY i.set_id, a.participant_code, i.qid")
     for r in rows:
-        r["shells"] = instances.active_shells.get(r["vmid"], 0)
+        r["shells"] = instances.shells_of(r)
+        r["nodes"] = [n for n in instances.nodes_of(r) if n["name"]]
     return _render(request, "admin/instances.html", {"rows": rows})
 
 
@@ -858,9 +863,7 @@ async def instance_action(request: Request, iid: int, action: str):
     if action == "stop":
         await instances.stop(inst)
     elif action == "start":
-        from .pve import client
-        await asyncio.to_thread(client().start, inst["kind"], inst["vmid"])
-        instances.set_status(inst["id"], "running")
+        await instances.start(inst)
     elif action == "destroy":
         await instances.destroy(inst)
     return _back("/admin/instances", _("{vmid} {action} 完成", vmid=inst['vmid'], action=action))

@@ -5,31 +5,81 @@
   const termOnly = !!window.TERM_ONLY;
   const T = window.TIMING || { timed: false };
   const $ = (id) => document.getElementById(id);
-  const btnCheck = $("btn-check"), btnReset = $("btn-reset"), btnRe = $("btn-reconnect"), btnCon = window.TERM_SWITCH === false ? null : $("btn-console");
-  const status = (text, on) => { $("term-status").textContent = text; $("dot").classList.toggle("on", !!on); };
+  const btnCheck = $("btn-check"), btnReset = $("btn-reset"), btnRe = $("btn-reconnect"), btnCon = $("btn-console");
   // 同一題的作答頁與終端機視窗互相通知
   const chan = "BroadcastChannel" in window ? new BroadcastChannel(`lsa-term-${sid}-${qid}`) : null;
 
   // ---------------- 終端機 ----------------
-  const term = new Terminal({
-    cursorBlink: true, fontSize: 15, scrollback: 5000,
-    fontFamily: 'ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace',
-    theme: { background: "#1e1e1e" },
-  });
-  const fit = new FitAddon.FitAddon();
-  term.loadAddon(fit);
-  term.open($("term"));
-  const refit = () => { if (!$("term").hidden) { try { fit.fit(); } catch (e) {} } };
-  new ResizeObserver(refit).observe($("term"));
-  refit();
-
-  let ws = null, pingTimer = null, wanted = true, retries = 0, retryTimer = null;
-  // useConsole：作答者按了「改用主控台」（自動重連也維持主控台）；inConsole：目前連的是主控台
-  const consoleDefault = window.TERM_DEFAULT === "console";   // 題目設定 terminal: console
-  let useConsole = consoleDefault, inConsole = false;
-  const conLabel = () => { if (btnCon) btnCon.textContent = inConsole ? t("改用 SSH") : t("改用主控台"); };
-  let popup = null;   // 作答頁開出的終端機視窗
+  // 每個分頁（多節點題的每台機器）各有一個 xterm 與連線；切換分頁不會中斷其他台的連線。單機題只有一個、不顯示分頁。
+  const TABS = window.TERM_TABS || [{ name: "", default: "ssh", switch: true }];
   const enc = new TextEncoder();
+  let popup = null;   // 作答頁開出的終端機視窗
+  let envReady = false;
+  const sessions = TABS.map(makeSession);
+  let cur = sessions[0];
+
+  function makeSession(tab) {
+    const el = document.createElement("div");
+    el.className = "term-pane";
+    el.hidden = true;
+    $("term").appendChild(el);
+    const term = new Terminal({
+      cursorBlink: true, fontSize: 15, scrollback: 5000,
+      fontFamily: 'ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace',
+      theme: { background: "#1e1e1e" },
+    });
+    const fit = new FitAddon.FitAddon();
+    term.loadAddon(fit);
+    term.open(el);
+    // useConsole：作答者按了「改用主控台」（自動重連也維持主控台）；inConsole：目前連的是主控台
+    const S = { tab, el, term, fit, ws: null, pingTimer: null, wanted: false, retries: 0, retryTimer: null,
+                consoleDefault: tab.default === "console", useConsole: tab.default === "console", inConsole: false,
+                started: false, statusText: "", statusOn: false, tabBtn: null };
+    term.onData((d) => { if (S.ws && S.ws.readyState === 1) S.ws.send(enc.encode(d)); });
+    term.onResize(({ cols, rows }) => {
+      if (S.ws && S.ws.readyState === 1) S.ws.send(JSON.stringify({ type: "resize", cols, rows }));
+    });
+    return S;
+  }
+
+  const setStatus = (S, text, on) => {
+    S.statusText = text; S.statusOn = !!on;
+    if (S.tabBtn) S.tabBtn.classList.toggle("on", !!on);
+    if (S === cur) { $("term-status").textContent = text; $("dot").classList.toggle("on", !!on); }
+  };
+  const status = (text, on) => sessions.forEach((S) => setStatus(S, text, on));
+  const conLabel = () => {
+    if (!btnCon) return;
+    btnCon.hidden = !cur.tab.switch;
+    btnCon.textContent = cur.inConsole ? t("改用 SSH") : t("改用主控台");
+  };
+  const refit = () => { if (!$("term").hidden && !cur.el.hidden) { try { cur.fit.fit(); } catch (e) {} } };
+  new ResizeObserver(refit).observe($("term"));
+
+  function show(S) {
+    cur = S;
+    sessions.forEach((x) => { x.el.hidden = x !== S; if (x.tabBtn) x.tabBtn.classList.toggle("active", x === S); });
+    setStatus(S, S.statusText, S.statusOn);
+    conLabel();
+    refit();
+    if (envReady && !S.started && !(popup && !popup.closed)) connect(S);
+    S.term.focus();
+  }
+  if (TABS.length > 1 || TABS[0].name) {
+    const bar = $("term-tabs");
+    bar.hidden = false;
+    sessions.forEach((S) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "term-tab";
+      b.innerHTML = '<span class="dot"></span>';
+      b.append(S.tab.name);
+      b.onclick = () => show(S);
+      S.tabBtn = b;
+      bar.appendChild(b);
+    });
+  }
+  show(cur);
 
   async function api(path, method = "POST") {
     const r = await fetch(`/api${qbase}/${path}`, { method });
@@ -37,63 +87,64 @@
     try { return await r.json(); } catch (e) { return { ok: false, error: `HTTP ${r.status}` }; }
   }
 
-  function disconnect() {
-    wanted = false;
-    clearTimeout(retryTimer);
-    clearInterval(pingTimer);
-    if (ws) { try { ws.close(); } catch (e) {} ws = null; }
+  function disconnect(S) {
+    S.wanted = false;
+    S.started = false;
+    clearTimeout(S.retryTimer);
+    clearInterval(S.pingTimer);
+    if (S.ws) { try { S.ws.close(); } catch (e) {} S.ws = null; }
   }
+  const disconnectAll = () => sessions.forEach(disconnect);
 
-  function connect() {
-    disconnect();
-    wanted = true;
-    inConsole = false;
-    conLabel();
+  function connect(S) {
+    disconnect(S);
+    S.wanted = true;
+    S.started = true;
+    S.inConsole = false;
+    if (S === cur) conLabel();
+    if (S === cur) refit();
     const proto = location.protocol === "https:" ? "wss" : "ws";
-    const sock = new WebSocket(`${proto}://${location.host}/ws/shell/${sid}/${encodeURIComponent(qid)}?cols=${term.cols}&rows=${term.rows}&console=${useConsole ? 1 : 0}`);
-    ws = sock;
+    const node = S.tab.name ? `&node=${encodeURIComponent(S.tab.name)}` : "";
+    const sock = new WebSocket(`${proto}://${location.host}/ws/shell/${sid}/${encodeURIComponent(qid)}?cols=${S.term.cols}&rows=${S.term.rows}&console=${S.useConsole ? 1 : 0}${node}`);
+    S.ws = sock;
     sock.binaryType = "arraybuffer";
-    sock.onopen = () => { status(t("已連線"), true); term.focus(); retries = 0; };
+    sock.onopen = () => { setStatus(S, t("已連線"), true); if (S === cur) S.term.focus(); S.retries = 0; };
     sock.onmessage = (ev) => {
       if (typeof ev.data === "string") {   // 伺服器的控制訊息
         try {
           const m = JSON.parse(ev.data);
           if (m.type === "notice") flash(m.text);
           if (m.type === "console") {  // 主控台連線（作答者選的，或 SSH 連不上自動改用）
-            inConsole = true;
-            conLabel();
-            status(m.forced ? t("主控台模式") : t("主控台模式（SSH 連不上）"), true);
+            S.inConsole = true;
+            if (S === cur) conLabel();
+            setStatus(S, m.forced ? t("主控台模式") : t("主控台模式（SSH 連不上）"), true);
             if (btnRe) btnRe.disabled = false;
           }
           if (m.type === "paused") {   // 開了別題，本題環境被暫停：不要自動重連
-            wanted = false;
-            status(t("本題環境已暫停（開啟了其他題目）"), false);
+            S.wanted = false;
+            setStatus(S, t("本題環境已暫停（開啟了其他題目）"), false);
             if (btnRe) btnRe.disabled = false;
           }
         } catch (e) {}
         return;
       }
-      term.write(new Uint8Array(ev.data));
+      S.term.write(new Uint8Array(ev.data));
     };
     sock.onclose = () => {
-      if (ws !== sock || !wanted || timeUp) return;
+      if (S.ws !== sock || !S.wanted || timeUp) return;
       // 自動重連（例如題目檢查時重開機、短暫斷網）
-      if (retries < 30) {
-        retries += 1;
-        status(t("連線中斷，自動重新連線中…"), false);
-        retryTimer = setTimeout(() => { if (wanted && !timeUp) connect(); }, 4000);
+      if (S.retries < 30) {
+        S.retries += 1;
+        setStatus(S, t("連線中斷，自動重新連線中…"), false);
+        S.retryTimer = setTimeout(() => { if (S.wanted && !timeUp) connect(S); }, 4000);
       } else {
-        status(t("連線已中斷，可按「重新連線」"), false);
+        setStatus(S, t("連線已中斷，可按「重新連線」"), false);
       }
     };
-    pingTimer = setInterval(() => {
-      if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "ping" }));
+    S.pingTimer = setInterval(() => {
+      if (S.ws && S.ws.readyState === 1) S.ws.send(JSON.stringify({ type: "ping" }));
     }, 60000);
   }
-  term.onData((d) => { if (ws && ws.readyState === 1) ws.send(enc.encode(d)); });
-  term.onResize(({ cols, rows }) => {
-    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "resize", cols, rows }));
-  });
 
   // ---------------- 禁止貼上（後台可選）----------------
   let flashTimer = null;
@@ -110,7 +161,7 @@
     const block = (e) => { e.preventDefault(); e.stopPropagation(); flash(t("本次測驗禁止貼上")); };
     // capture 階段攔截，事件不會到 xterm 的 textarea
     ["paste", "drop"].forEach((t) => $("term").addEventListener(t, block, true));
-    term.attachCustomKeyEventHandler((e) => {
+    sessions.forEach((S) => S.term.attachCustomKeyEventHandler((e) => {
       const k = (e.key || "").toLowerCase();
       if (e.type === "keydown" && (((e.ctrlKey || e.metaKey) && k === "v") || (e.shiftKey && k === "insert"))) {
         flash(t("本次測驗禁止貼上"));
@@ -118,40 +169,47 @@
         return false;
       }
       return true;
-    });
+    }));
   }
 
   const actionBtns = () => [btnCheck, btnReset, btnRe, btnCon].filter(Boolean);
 
+  // opts.all：整組重新連線（第一次開啟、重置後）；否則只重連目前這個分頁（其他台的連線不受影響）
+  // opts.console：目前分頁改用主控台／SSH
   async function start(opts) {
-    useConsole = opts && "console" in opts ? !!opts.console : consoleDefault;
+    opts = opts || {};
+    const targets = opts.all ? sessions : [cur];
+    cur.useConsole = "console" in opts ? !!opts.console : cur.consoleDefault;
+    if (opts.all) sessions.forEach((S) => { S.useConsole = S.consoleDefault; });
+    targets.forEach((S) => { disconnect(S); S.term.reset(); });
     actionBtns().forEach((b) => (b.disabled = true));
-    status(t("準備環境中…第一次開啟約需 10~30 秒"), false);
-    term.reset();
+    targets.forEach((S) => setStatus(S, t("準備環境中…第一次開啟約需 10~30 秒"), false));
     const r = await api("start");
     if (!r.ok) {
-      status(t("環境啟動失敗"), false);
-      term.write(`\r\n\x1b[31m${r.error}\x1b[0m\r\n`);
+      targets.forEach((S) => setStatus(S, t("環境啟動失敗"), false));
+      cur.term.write(`\r\n\x1b[31m${r.error}\x1b[0m\r\n`);
       if (btnReset) btnReset.disabled = false;
       if (btnRe) btnRe.disabled = false;
       if (btnCon) btnCon.disabled = false;
       return;
     }
+    envReady = true;
     actionBtns().forEach((b) => (b.disabled = false));
     if (popup && !popup.closed) { status(t("終端機在新視窗"), false); return; }
-    connect();
+    targets.forEach((S) => { if (S !== cur) setStatus(S, "", false); });
+    connect(cur);
   }
   if (btnRe) btnRe.onclick = () => start();
-  if (btnCon) btnCon.onclick = () => start({ console: !inConsole });
+  if (btnCon) btnCon.onclick = () => start({ console: !cur.inConsole });
 
   // ---------------- 單題限時 ----------------
   let timeUp = false;
   function onTimeUp() {
     if (timeUp) return;
     timeUp = true;
-    disconnect();
+    disconnectAll();
     status(t("本題作答時間到"), false);
-    term.write(`\r\n\x1b[1;33m${t("本題作答時間到，連線已關閉，環境將重置。")}\x1b[0m\r\n`);
+    cur.term.write(`\r\n\x1b[1;33m${t("本題作答時間到，連線已關閉，環境將重置。")}\x1b[0m\r\n`);
     actionBtns().forEach((b) => (b.disabled = true));
     if (!termOnly) setTimeout(() => location.reload(), 6000);
   }
@@ -181,16 +239,16 @@
   if (termOnly) {
     // 標題由樣板產生
     if (chan) {
-      chan.onmessage = (ev) => { if (ev.data === "restart") start(); };
+      chan.onmessage = (ev) => { if (ev.data === "restart") start({ all: true }); };
       chan.postMessage("popup-open");
       window.addEventListener("beforeunload", () => chan.postMessage("popup-closed"));
     }
     if (T.timed && !T.active) {
       status(t("尚未開始作答"), false);
-      term.write(t("本題限時作答，請回到題目頁按「開始作答」。") + "\r\n");
+      cur.term.write(t("本題限時作答，請回到題目頁按「開始作答」。") + "\r\n");
       return;
     }
-    start();
+    start({ all: true });
     return;
   }
 
@@ -199,8 +257,8 @@
     $("term").hidden = on;
     $("popped").hidden = !on;
     $("btn-popout").hidden = on;
-    if (on) { disconnect(); status(t("終端機在新視窗"), false); }
-    else { refit(); connect(); }
+    if (on) { disconnectAll(); status(t("終端機在新視窗"), false); }
+    else { refit(); sessions.forEach((S) => { if (S !== cur) setStatus(S, "", false); }); connect(cur); }
   }
   $("btn-popout").onclick = () => {
     popup = window.open(`${qbase}/term`, `lsa-term-${sid}-${qid}`,
@@ -283,10 +341,10 @@
   btnReset.onclick = async () => {
     if (!confirm(t("確定要重置本題？你在此環境做的所有修改都會消失，回到題目初始狀態。"))) return;
     btnReset.disabled = true;
-    disconnect();
+    disconnectAll();
     const r = await api("reset");
     if (!r.ok) { alert(r.error); btnReset.disabled = false; return; }
-    await start();
+    await start({ all: true });
     if (chan) chan.postMessage("restart");   // 讓終端機視窗重新連到新環境
   };
 
@@ -315,6 +373,6 @@
     return;
   }
 
-  start();
+  start({ all: true });
   poll();
 })();

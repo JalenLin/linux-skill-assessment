@@ -406,11 +406,21 @@ async def api_runs(request: Request, sid: int, qid: str):
 
 def _wants_console(ws: WebSocket, q) -> bool:
     """console=1／0：作答者按了「改用主控台／改用 SSH」；沒給、或題目不允許切換（-only），就照題目的 terminal 設定。
-    在伺服器端決定：作答者自己改網址也換不了不允許的方式。"""
+    在伺服器端決定：作答者自己改網址也換不了不允許的方式。q 可以是題目或多節點題的節點（都有 terminal_*）。"""
     v = ws.query_params.get("console")
     if q.terminal_switchable and v in ("0", "1"):
         return v == "1"
     return q.terminal_default == "console"
+
+
+def _shell_target(ws: WebSocket, q, inst: dict):
+    """回傳 (要連的機器, 它的 terminal 設定來源)；不能連（節點不存在或 terminal: none）回傳 (None, None)"""
+    if not q.is_group:
+        return inst, q
+    node = q.node(ws.query_params.get("node") or "")
+    if node is None or node.terminal == "none":
+        return None, None
+    return instances.node_target(inst, node.name), node
 
 
 @app.websocket("/ws/shell/{sid}/{qid}")
@@ -429,6 +439,11 @@ async def ws_shell(ws: WebSocket, sid: int, qid: str):
         await ws.send_bytes(f"\r\n{blocked or _('環境尚未啟動。')}\r\n".encode())
         await ws.close()
         return
+    target, tq = _shell_target(ws, q, inst)
+    if target is None:
+        await ws.send_bytes(f"\r\n{_('這台機器不提供終端機。')}\r\n".encode())
+        await ws.close()
+        return
 
     def still_open() -> str | None:
         cur = sets.get(sid)
@@ -442,8 +457,8 @@ async def ws_shell(ws: WebSocket, sid: int, qid: str):
     attempts.shell_opened(acc["id"], sid, qid)
     log_activity(ws, acc, sid, "shell", qid)
     try:
-        await shell.serve(ws, acc, inst, still_open, block_paste=bool(s["block_paste"]),
-                          force_console=_wants_console(ws, q), allow_console=q.terminal != "ssh-only",
-                          switchable=q.terminal_switchable)
+        await shell.serve(ws, acc, target, still_open, block_paste=bool(s["block_paste"]),
+                          force_console=_wants_console(ws, tq), allow_console=tq.terminal != "ssh-only",
+                          switchable=tq.terminal_switchable)
     finally:
         attempts.shell_closed(acc["id"], sid, qid)

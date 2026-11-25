@@ -44,6 +44,10 @@ class Config:
     net_prefix_len: int = 16
     build_gateway: str = "10.10.0.1"     # 只有建置範圍 10.10.255.0/24 會被 NAT
     build_dns: str = "1.1.1.1"
+    # 多節點題的題目網路：vmbr1 開 VLAN-aware，每組每個網路一個 VLAN（eth1…）；eth0 仍是管理網路
+    vlan_min: int = 100                  # 作答者環境組
+    vlan_max: int = 3999
+    build_vlan: int = 4090               # 建置範本與自我測試用 4090～4093（一次只建一題）
 
     # --- SSH / 校驗 ---
     ssh_key: str = "/etc/lsa/grader_key"

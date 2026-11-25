@@ -61,7 +61,7 @@ cd /root/lsa-src/deploy
 
 | 步驟 | 做什麼 | 時間 |
 |---|---|---|
-| `network` | 建立測驗內網 **vmbr1**（10.10.0.0/16）與防火牆規則；安裝 hookscript（作答者之間 port isolation） | 數秒 |
+| `network` | 建立測驗內網 **vmbr1**（10.10.0.0/16，VLAN-aware：多節點題的題目網路用）與防火牆規則；安裝 hookscript（作答者之間 port isolation） | 數秒 |
 | `perms` | 建立 pool `lsa`、API 使用者 `lsa@pve` 與 token（存到 `/root/lsa/token.json`），權限只限 pool `lsa` | 數秒 |
 | `base` | 下載 Ubuntu 24.04 LXC 映像，建立 **LXC base 範本 9000**（帳號 `user`/`user` 可 sudo、openssh、python3、評分金鑰） | 5~10 分鐘 |
 | `basevm` | 下載 Ubuntu 24.04 cloud image，建立 **VM base 範本 9001**（給需要 kernel 功能的題目） | 5~15 分鐘 |
@@ -186,6 +186,7 @@ pct pull 100 /var/lib/lsa/data/lsa-$(date +%F).db /root/lsa-backup-$(date +%F).d
 ## 10. 安全性說明
 
 - 作答者環境只在 vmbr1：不能上網、不能連 PVE 主機、彼此不能互連（hookscript 設定 bridge port isolation）
+- 多節點題同一組的機器之間另有題目網路（eth1…），每組一個 VLAN，組與組之間互相看不到
 - lsa-web 的 vmbr1 介面只允許主動連出（作答者環境連不到網站的任何服務）
 - PVE API token 只有 pool `lsa` 與指定儲存空間的權限，碰不到其他 VM
 - 作答者在自己的環境裡有 sudo；評分盡量從 lsa-web 從外部驗證（見 QUESTIONS.md）

@@ -12,7 +12,7 @@ DB_PATH = cfg.data_path / "lsa.db"
 
 # 資料庫結構版本（PRAGMA user_version）。
 # 改結構時：SCHEMA 改成最新版（給新安裝），SCHEMA_VERSION + 1，並在 MIGRATIONS 加上從上一版升級的 SQL。
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS accounts (
@@ -76,7 +76,23 @@ CREATE TABLE IF NOT EXISTS instances (
     template_version TEXT,
     created_at TEXT DEFAULT (datetime('now','localtime')),
     last_access TEXT,
+    vlans TEXT,                              -- 多節點題：{網路名稱: VLAN} (JSON)
     UNIQUE(account_id, set_id, qid)
+);
+CREATE TABLE IF NOT EXISTS instance_nodes (   -- 多節點題的每台機器（instances.vmid/kind/ip 是第一台）
+    instance_id INTEGER NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    vmid INTEGER UNIQUE NOT NULL,
+    kind TEXT NOT NULL,
+    ip TEXT NOT NULL,                        -- 管理網路（eth0）
+    PRIMARY KEY (instance_id, name)
+);
+CREATE TABLE IF NOT EXISTS template_nodes (   -- 多節點題每個節點的範本（templates.vmid 是第一台）
+    qid TEXT NOT NULL,
+    name TEXT NOT NULL,
+    vmid INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    PRIMARY KEY (qid, name)
 );
 CREATE TABLE IF NOT EXISTS check_runs (
     id INTEGER PRIMARY KEY,
@@ -118,7 +134,9 @@ CREATE INDEX IF NOT EXISTS idx_activity_sa ON activity(set_id, account_id);
 """
 
 # {版本: 從上一版升級到這一版的 SQL}；例：{2: "ALTER TABLE qsets ADD COLUMN foo TEXT"}
-MIGRATIONS: dict[int, str] = {}
+MIGRATIONS: dict[int, str] = {
+    2: "ALTER TABLE instances ADD COLUMN vlans TEXT",   # instance_nodes / template_nodes 由 SCHEMA 建立
+}
 
 
 def _connect() -> sqlite3.Connection:

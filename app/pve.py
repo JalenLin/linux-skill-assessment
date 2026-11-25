@@ -1,6 +1,7 @@
 """PVE API 包裝（同步；呼叫端用 asyncio.to_thread）。"""
 from __future__ import annotations
 
+import re
 import threading
 import time
 
@@ -115,6 +116,31 @@ class PVE:
                 kw["nameserver"] = nameserver
             self.set_config(kind, vmid, **kw)
 
+    def set_nics(self, kind: str, vmid: int, nics: list[tuple[int, int, str, str | None]]) -> None:
+        """題目網路：[(編號, VLAN, "IP/prefix", gateway)] → net<編號>（eth<編號>），接 vmbr1 的該 VLAN"""
+        kw: dict = {}
+        for idx, tag, ip, gw in nics:          # ip None：接上網路但不設 IP
+            if kind == "lxc":
+                kw[f"net{idx}"] = (f"name=eth{idx},bridge={cfg.bridge},tag={tag},ip={ip or 'manual'},firewall=0"
+                                   + (f",gw={gw}" if gw else ""))
+            else:
+                kw[f"net{idx}"] = f"virtio,bridge={cfg.bridge},tag={tag},firewall=0"
+                if ip:
+                    kw[f"ipconfig{idx}"] = f"ip={ip}" + (f",gw={gw}" if gw else "")
+        if kw:
+            self.set_config(kind, vmid, **kw)
+
+    def grow_disk(self, kind: str, vmid: int, size_gb: int) -> None:
+        """根磁碟放大到 size_gb（只會變大）"""
+        disk = "rootfs" if kind == "lxc" else "scsi0"
+        cur = self.get_config(kind, vmid).get(disk, "")
+        m = re.search(r"size=(\d+)G", cur)
+        if m and int(m.group(1)) >= size_gb:
+            return
+        r = self._retry_locked(lambda: self._vm(kind, vmid).resize.put(disk=disk, size=f"{int(size_gb)}G"))
+        if isinstance(r, str) and r.startswith("UPID"):
+            self.wait(r)
+
     def start(self, kind: str, vmid: int) -> None:
         if self.status(kind, vmid) == "running":
             return
@@ -194,6 +220,12 @@ class MockPVE:
         pass
 
     def set_network(self, *a, **kw):
+        pass
+
+    def set_nics(self, *a, **kw):
+        pass
+
+    def grow_disk(self, *a, **kw):
         pass
 
     def start(self, kind, vmid):

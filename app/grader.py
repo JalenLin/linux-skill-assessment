@@ -50,21 +50,39 @@ class RunResult:
     success: bool              # playbook 整體是否成功（setup / solution 用）
 
 
-def run_playbook(qdir: Path, playbook: str, ip: str, timeout: int | None = None) -> RunResult:
-    """同步執行 playbook"""
+def _host(ip: str) -> dict:
+    return {
+        "ansible_host": ip,
+        "ansible_user": "root",
+        "ansible_ssh_private_key_file": cfg.ssh_key,
+        "ansible_python_interpreter": "/usr/bin/python3",
+        "ansible_ssh_common_args": "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
+                                   "-o ConnectTimeout=10",
+        "target_ip": ip,
+    }
+
+
+def inventory_for(target: str | list[dict]) -> dict:
+    """單機題：一台 host「target」。多節點題：target 是 [{name, ip, nics}]，host 名稱就是節點名稱；
+    每台另有 node_ip（第一個題目網路的 IP），全部節點的資料放在 lsa_nodes"""
+    if isinstance(target, str):
+        return {"all": {"hosts": {"target": _host(target)}}}
+    nodes = {n["name"]: {"mgmt_ip": n["ip"], "ips": {k: v.split("/")[0] for k, v in n["nics"].items() if v}}
+             for n in target}
+    hosts = {}
+    for n in target:
+        ips = nodes[n["name"]]["ips"]
+        hosts[n["name"]] = {**_host(n["ip"]), "node_ip": next(iter(ips.values()), n["ip"])}
+    return {"all": {"hosts": hosts, "vars": {"lsa_nodes": nodes}}}
+
+
+def run_playbook(qdir: Path, playbook: str, target: str | list[dict], timeout: int | None = None) -> RunResult:
+    """同步執行 playbook；target 見 inventory_for"""
     import ansible_runner
 
     tmp = Path(tempfile.mkdtemp(prefix="lsa-run-"))
     try:
-        inventory = {"all": {"hosts": {"target": {
-            "ansible_host": ip,
-            "ansible_user": "root",
-            "ansible_ssh_private_key_file": cfg.ssh_key,
-            "ansible_python_interpreter": "/usr/bin/python3",
-            "ansible_ssh_common_args": "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
-                                       "-o ConnectTimeout=10",
-            "target_ip": ip,
-        }}}}
+        inventory = inventory_for(target)
         r = ansible_runner.run(
             private_data_dir=str(tmp),
             project_dir=str(qdir),
@@ -177,17 +195,23 @@ async def _execute(run_id: int, account: dict, sid: int, q: Question, final: boo
                 score, total, items = score_of(q, {}, checks)
                 finish("done", f"無法連線到環境：{e}", score, total, items)
                 return
-            if cfg.mock:
-                await asyncio.sleep(0.3)
-                from .pve import client
-                rr = RunResult(client().mock_results(inst["vmid"], [c.id for c in q.checks]), "ok", "(mock)", True)
-            else:
-                rr = await asyncio.to_thread(run_playbook, q.path, "check.yml", inst["ip"])
-                if rr.status == "unreachable":
-                    # 主機忙碌時（大量 VM 同時開機/重開）可能暫時連不上：等一下再完整重跑一次，避免誤判 0 分
-                    log.warning("check unreachable, retrying: %s %s", account["username"], q.qid)
-                    await asyncio.sleep(30)
-                    rr = await asyncio.to_thread(run_playbook, q.path, "check.yml", inst["ip"])
+            graders = await instances.start_graders(inst, q)   # mock 模式也走這段（MockPVE）
+            try:
+                if cfg.mock:
+                    await asyncio.sleep(0.3)
+                    from .pve import client
+                    rr = RunResult(client().mock_results(inst["vmid"], [c.id for c in q.checks]), "ok", "(mock)", True)
+                else:
+                    target = instances.playbook_target(inst, q)
+                    rr = await asyncio.to_thread(run_playbook, q.path, "check.yml", target)
+                    if rr.status == "unreachable":
+                        # 主機忙碌時（大量 VM 同時開機/重開）可能暫時連不上：等一下再完整重跑一次，避免誤判 0 分
+                        log.warning("check unreachable, retrying: %s %s", account["username"], q.qid)
+                        await asyncio.sleep(30)
+                        rr = await asyncio.to_thread(run_playbook, q.path, "check.yml", target)
+            finally:
+                if graders:   # 檢查完就關掉，作答時看不到 grader
+                    asyncio.get_running_loop().create_task(instances.stop_graders(graders))
             results, status, out = rr.results, rr.status, rr.stdout
             if final and not was_running:
                 # 正常關機要幾秒～幾十秒：放到背景做，不佔檢查名額
@@ -195,7 +219,8 @@ async def _execute(run_id: int, account: dict, sid: int, q: Question, final: boo
             score, total, items = score_of(q, results, checks)
             msg = {
                 "ok": "檢查完成",
-                "unreachable": "評分程式無法登入環境（root SSH 被修改？）—以 0 分計，可重置本題",
+                "unreachable": ("評分程式無法登入部分機器（root SSH 被修改？）—那幾台的項目以 0 分計，可重置本題"
+                                if q.is_group else "評分程式無法登入環境（root SSH 被修改？）—以 0 分計，可重置本題"),
                 "timeout": "檢查逾時",
                 "failed": "檢查程式執行失敗",
             }[status]

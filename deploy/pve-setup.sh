@@ -39,9 +39,16 @@ iface vmbr1 inet static
 	bridge-ports none
 	bridge-stp off
 	bridge-fd 0
+	bridge-vlan-aware yes
+	bridge-vids 2-4094
 	post-up /usr/local/sbin/lsa-net.sh
 #linux-skill-assessment internal network
 EOF
+  elif ! awk '/^auto vmbr1/{f=1} f&&/bridge-vlan-aware/{v=1} f&&/^$/{f=0} END{exit !v}' /etc/network/interfaces; then
+    # 舊安裝：vmbr1 改成 VLAN-aware（多節點題的題目網路用；沒有 tag 的現有網卡不受影響）
+    cp /etc/network/interfaces "/etc/network/interfaces.bak.$(date +%s)"
+    sed -i '/^iface vmbr1 /,/^$/ s/^\(\s*\)bridge-fd 0$/\1bridge-fd 0\n\1bridge-vlan-aware yes\n\1bridge-vids 2-4094/' \
+      /etc/network/interfaces
   fi
   install -m 755 pve/lsa-net.sh /usr/local/sbin/lsa-net.sh
   ifreload -a

@@ -2,7 +2,7 @@
 
 - 存放：<data>/shell_logs/a<帳號 id>/s<題組 id>-<題目 id>-<YYYYmmdd-HHMMSS>.cast
   （依帳號存放：編號換綁、帳號刪除後重建都不會混在一起）
-- 事件："o" 畫面輸出、"i" 鍵盤輸入、"r" 視窗大小改變、"m" 標記（被擋下的貼上、改用主控台）
+- 事件："o" 畫面輸出、"i" 鍵盤輸入、"r" 視窗大小改變、"m" 標記（被擋下的貼上、改用主控台、多節點題的節點 "NODE: <名稱>"）
 - 後台用 asciinema-player 重播；另外提供輸入列表（點一下跳到該時間）與純文字檢視
 - 刪除帳號 → 刪掉整個 a<id>/；刪除題組 → 刪掉所有 s<題組 id>-*.cast
 """
@@ -20,6 +20,7 @@ from .config import cfg
 NAME_RE = re.compile(r"^s(\d+)-([a-z0-9][a-z0-9-]*)-(\d{8}-\d{6})(?:-\d+)?\.cast$")
 ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[()][A-Z0-9]|\x1b[=>78]")
 PASTE_LABEL = "PASTE BLOCKED"
+NODE_LABEL = "NODE: "
 _KEYS = {"\x1b[A": "↑", "\x1b[B": "↓", "\x1b[C": "→", "\x1b[D": "←", "\x1bOA": "↑", "\x1bOB": "↓",
          "\x1bOC": "→", "\x1bOD": "←", "\x1b[H": "Home", "\x1b[F": "End", "\x1b[3~": "Del",
          "\x7f": "⌫", "\x08": "⌫", "\t": "⇥", "\x1b": "Esc"}
@@ -125,6 +126,8 @@ def list_for(account_id: int, set_names: dict[int, str] | None = None) -> list[d
             "duration": events[-1][0] if events else 0.0,
             "inputs": sum(1 for e in events if e[1] == "i"),
             "blocked": sum(1 for e in events if e[1] == "m" and str(e[2]).startswith(PASTE_LABEL)),
+            "node": next((str(e[2])[len(NODE_LABEL):] for e in events
+                          if e[1] == "m" and str(e[2]).startswith(NODE_LABEL)), ""),
             "size": p.stat().st_size,
         })
     out.sort(key=lambda r: r["started"], reverse=True)

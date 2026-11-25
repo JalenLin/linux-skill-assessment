@@ -63,7 +63,7 @@ cd /root/lsa-src/deploy
 
 | Step | What it does | Time |
 |---|---|---|
-| `network` | Creates the internal assessment network **vmbr1** (10.10.0.0/16) and firewall rules; installs the hookscript (port isolation between participants) | Seconds |
+| `network` | Creates the internal assessment network **vmbr1** (10.10.0.0/16, VLAN-aware for multi-node question networks) and firewall rules; installs the hookscript (port isolation between participants) | Seconds |
 | `perms` | Creates the pool `lsa`, the API user `lsa@pve` and a token (saved to `/root/lsa/token.json`); permissions are limited to the pool `lsa` | Seconds |
 | `base` | Downloads the Ubuntu 24.04 LXC image and creates the **LXC base template 9000** (account `user`/`user` with sudo, openssh, python3, grader key) | 5–10 minutes |
 | `basevm` | Downloads the Ubuntu 24.04 cloud image and creates the **VM base template 9001** (for questions that need kernel features) | 5–15 minutes |
@@ -188,6 +188,7 @@ To restore: stop the service, put `lsa.db` back, change its owner back to `lsa`,
 ## 10. Security notes
 
 - Participant environments are only on vmbr1: they cannot reach the Internet, cannot reach the PVE host, and cannot reach each other (the hookscript sets bridge port isolation)
+- The machines of one multi-node group also share question networks (eth1…), one VLAN per group; groups cannot see each other
 - lsa-web's vmbr1 interface only allows outbound connections (participant environments cannot reach any service on the web server)
 - The PVE API token only has permissions on the pool `lsa` and the designated storage; it cannot touch other VMs
 - Participants have sudo in their own environments; grading verifies from the outside, from lsa-web, as much as possible (see QUESTIONS.md)

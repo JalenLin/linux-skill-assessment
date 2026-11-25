@@ -20,7 +20,8 @@
     {% for r in rows %}
     <tr><td><a href="/admin/participant/{{ r.account_id }}">{{ r.participant_code or r.username }}</a></td>
       <td>{{ r.set_name or '#%s' % r.set_id }}</td><td>{{ r.qid }}</td>
-      <td>{{ r.vmid }}</td><td>{{ r.ip }}</td><td><span class="tag {{ r.status }}">{{ r.status }}</span></td>
+      <td>{% if r.nodes %}{% for n in r.nodes %}<div>{{ n.vmid }} <span class="muted">{{ n.name }}</span></div>{% endfor %}{% else %}{{ r.vmid }}{% endif %}</td>
+      <td>{% if r.nodes %}{% for n in r.nodes %}<div>{{ n.ip }}</div>{% endfor %}{% else %}{{ r.ip }}{% endif %}</td><td><span class="tag {{ r.status }}">{{ r.status }}</span></td>
       <td>{{ r.shells or '' }}</td><td class="muted">{{ r.created_at }}</td><td class="muted">{{ r.last_access }}</td>
       <td>
         {% if r.status == 'running' %}<form class="inline" method="post" action="/admin/instances/{{ r.id }}/stop"><button class="link">{{ _("停止") }}</button></form>

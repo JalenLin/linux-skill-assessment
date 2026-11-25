@@ -1,0 +1,39 @@
+# Example multi-container question: two networks joined by a router, three LXC containers.
+#
+#   pc1 ──(lan 192.168.10.0/24)── r1 ──(dmz 172.16.0.0/24)── web
+#
+# Each node gets eth0 (management: terminal and grading, don't touch) plus one NIC per entry in `nics`,
+# in the order written (r1: eth1 = lan, eth2 = dmz). Every participant's group has its own VLAN per network,
+# so all groups use the same IPs. See docs/en/QUESTIONS.md "Multi-node questions".
+title: The client cannot reach the DMZ web server (example multi-container question)
+tags: [network, routing, firewall, multi-node, example]
+type: lxc            # default for nodes; a node can override it with type: vm
+lang: en
+resources:           # defaults for every node; a node can override cores / memory / swap / disk
+  cores: 1
+  memory: 256
+networks:            # question networks; each one is a separate VLAN (a switch) per participant
+  lan: {cidr: 192.168.10.0/24, gateway: 192.168.10.1}   # gateway: default route of the nodes on this network
+  dmz: {cidr: 172.16.0.0/24, gateway: 172.16.0.1}       # (r1 owns both addresses, so r1 itself gets none)
+  # wire: {}         # a network without cidr: nodes attach with `wire: ~` and get no IP (participants set it)
+nodes:               # node name = hostname = Ansible host name; one terminal tab per node
+  pc1: {nics: {lan: 192.168.10.10}}
+  r1:  {nics: {lan: 192.168.10.1, dmz: 172.16.0.1}}
+  web: {nics: {dmz: 172.16.0.10}}
+  # role: grader — used only by check.yml: no tab, no participant account, and it is powered off except while a
+  # check runs, so participants can't see or tamper with it. Tests from here see what a real LAN client sees.
+  grader: {role: grader, nics: {lan: 192.168.10.250}}
+  # a node can also set terminal: ssh / console / ssh-only / console-only / none (no tab)
+checks:
+  - id: forward
+    desc: r1 forwards packets between the networks, also after a reboot (the check reboots r1)
+    points: 4
+  - id: web           # every item must fail in the unsolved state (self-test), so "keep the firewall on" is
+    desc: A client on the LAN can open http://172.16.0.10/, and web's firewall still blocks other ports
+    points: 6         # part of this item rather than an item of its own
+i18n:
+  zh-TW:
+    title: 用戶端連不到 DMZ 的網頁伺服器（多容器範例題）
+    checks:
+      forward: r1 會在兩個網路之間轉送封包，重開機後也一樣（檢查時會重開 r1）
+      web: LAN 上的用戶端可以開啟 http://172.16.0.10/，而且 web 的防火牆仍會擋其他 port

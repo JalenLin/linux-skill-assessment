@@ -9,16 +9,17 @@
     <span class="spacer"></span>
     {% if timing.timed %}{{ _("本題剩餘") }} <span class="countdown" id="attempt-left">--:--</span> ·{% endif %}
     {% if seconds_left is not none %}{{ _("開放剩餘") if s.mode == 'practice' else _("測驗剩餘") }} <span class="countdown" id="countdown" data-left="{{ seconds_left }}" data-home="{{ sbase }}">--:--:--</span>{% endif %}
-    <button class="bar-btn" id="btn-console"{% if not q.terminal_switchable %} hidden{% endif %} title="{{ _("不經過網路連到你的環境（改壞了網路、防火牆或 sshd 時用）") }}">{{ _("改用主控台") }}</button>
+    <button class="bar-btn" id="btn-console" hidden title="{{ _("不經過網路連到你的環境（改壞了網路、防火牆或 sshd 時用）") }}">{{ _("改用主控台") }}</button>
     <button class="bar-btn" id="btn-reconnect">{{ _("重新連線") }}</button>
   </div>
+  <div class="term-tabs" id="term-tabs" hidden></div>
   <div id="term"></div>
 </section>
 {% endblock %}
 {% block scripts %}
 <script src="/static/vendor/xterm.js"></script>
 <script src="/static/vendor/addon-fit.js"></script>
-<script>window.QID = {{ q.qid | tojson }}; window.TERM_ONLY = true; window.SID = {{ s.id }}; window.TIMING = {{ timing | tojson }}; window.BLOCK_PASTE = {{ s.block_paste | tojson }}; window.TERM_DEFAULT = {{ q.terminal_default | tojson }}; window.TERM_SWITCH = {{ q.terminal_switchable | tojson }};</script>
+<script>window.QID = {{ q.qid | tojson }}; window.TERM_ONLY = true; window.SID = {{ s.id }}; window.TIMING = {{ timing | tojson }}; window.BLOCK_PASTE = {{ s.block_paste | tojson }}; window.TERM_TABS = {{ q.terminal_tabs() | tojson }};</script>
 <script src="/static/app.js"></script>
 <script src="/static/question.js"></script>
 {% endblock %}

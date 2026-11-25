@@ -12,6 +12,7 @@
 - [check.yml：評分](#checkyml評分)
 - [solution.yml：標準解答與自我測試](#solutionyml標準解答與自我測試)
 - [LXC 還是 VM？](#lxc-還是-vm)
+- [多節點題](#多節點題)
 - [多國語言](#多國語言)
 - [開發與測試流程](#開發與測試流程)
 - [出題建議](#出題建議)
@@ -200,6 +201,66 @@ i18n:                # 選用：其他語言（見「多國語言」）
 
 **能用 LXC 就用 LXC。** VM 題多時記憶體與 CPU 消耗會大很多（見 [OPERATIONS.md](OPERATIONS.md)）。
 LXC 容器是 unprivileged + nesting，可以跑 Docker。
+
+## 多節點題
+
+一題由多台機器組成，每位作答者一整組。範例：
+
+- [`questions/example-net`](../questions/example-net)：3 個 LXC 容器、兩個網路加一台路由器（路由、防火牆），一組約 0.3GB
+- [`questions/example-k8s`](../questions/example-k8s)：3 台 VM 的 kubeadm 叢集，一組約 5.5GB
+
+```yaml
+type: vm                 # 節點預設的類型；個別節點可以寫 type: lxc
+networks:                # 題目網路：每個網路 = 每組一個獨立的 VLAN（一台交換器）
+  lab: {cidr: 192.168.50.0/24, gateway: 192.168.50.1}   # gateway 選填：預設路由（不一定要真的存在）
+nodes:                   # 節點名稱 = 主機名稱 = Ansible host 名稱 = 終端機分頁名稱
+  cp1: {nics: {lab: 192.168.50.11}, cores: 2, memory: 2560, disk: 16}
+  w1:  {nics: {lab: 192.168.50.21}}
+  db:  {type: lxc, nics: {lab: 192.168.50.30}, terminal: none}
+```
+
+| 節點欄位 | 說明 |
+|---|---|
+| `type` | `lxc` 或 `vm`，沒寫用題目的 `type` |
+| `cores`／`memory`／`swap` | 沒寫用題目的 `resources` |
+| `disk` | 根磁碟放大到幾 GB（選填） |
+| `nics` | `{網路名稱: IP}`；**依寫的順序**成為 eth1、eth2…。IP 寫 `~` 表示接上這個網路但不設 IP（作答者自己設） |
+| `terminal` | `ssh`／`console`／`ssh-only`／`console-only`（同單機題），或 `none`：不顯示分頁，只能從別台經題目網路連過去 |
+| `role` | `grader`：評分專用的節點（見下方），必須是 LXC |
+
+`networks` 的每個網路：`cidr`（選填；沒有 cidr 的網路只能接線、不能指定 IP）、`gateway`（選填，接在這個網路上的節點的預設路由；
+節點的 IP 就是 gateway 時，例如路由器，那台不設預設路由；一台接多個網路時只用第一個有 gateway 的）。
+寫錯或拼錯的欄位（例如 `nic:`、`resources:`）會在題庫頁顯示錯誤；多節點題不用 `hostname`。
+
+網路：
+
+- **eth0 是管理網路**（終端機與評分走這裡），不要在題目裡改它或用防火牆擋它。題目的防火牆規則請用網卡寫（`iifname eth1 ...`）：
+  Linux 經 eth1 也能連到本機 eth0 的 IP，只用目的 IP 寫的規則擋不住
+- 每組的題目網路是自己的 VLAN，**每組都用一樣的 IP 與主機名稱**，所以整個環境（例如 kubeadm 叢集）在建置範本時就做好，複製出來直接能用
+- 作答者在 eth1 自己加 VLAN 子介面也進不了別組的網路（PVE 只讓該 port 收這個 VLAN）；eth0 也只留管理用的 VLAN
+- 最多 8 台、4 個題目網路
+- **LXC 節點的 eth1… 設定由 PVE 管理，每次開機都會重寫**（`/etc/systemd/network/eth*.network`）：作答者改 IP 的題目、
+  或要在 IP 設定上埋錯，請用 VM 節點（cloud-init 只在第一次開機設定，之後保留作答者的修改）
+- `terminal: none` 的節點：作答者要從別台連過去，請在 setup.yml 準備好登入方式（例如 SSH 金鑰），base 的 sshd 只接受金鑰
+- PVE 主機需要 VLAN-aware 的 vmbr1：舊安裝請在 PVE 上重新執行 `deploy/pve-setup.sh network`（現有題目不受影響）
+
+Ansible：
+
+- inventory 每個節點一台 host（名稱就是節點名稱），可以用 `hosts: cp1`、`hosts: all:!cp1`
+- 每台的變數：`target_ip`（管理 IP）、`node_ip`（第一個題目網路的 IP）；全部節點：`lsa_nodes`
+  （`{名稱: {mgmt_ip, ips: {網路: IP}}}`）
+- 建置時 eth0 可以上網（預設路由走 eth0），題目網路的 `gateway` 在轉成範本時才加上；作答時沒有網路，套件與映像要在 setup.yml 先裝好
+- 檢查時某台 SSH 不通：那台的檢查項目算失敗，其他台照常評分
+
+**grader 節點**（`role: grader`）：作答者看不到、沒有帳號，**平常關機，按「檢查作答」時才開機，檢查完就關掉**。
+check.yml 用 `hosts: grader` 從這台去測其他節點（ping、curl、連線測試），檢查的是作答者機器「對外的效果」，
+作答者在自己機器上換掉 curl、sysctl 之類的指令也騙不過。每次檢查多約 5 秒開機時間；一組多一台 LXC（約 50MB、一個 LV）。
+範例：`example-net` 從 grader 測網頁，並確認 web 的其他 port 仍被防火牆擋住（「全部放行」過不了）。
+
+作答者：作答頁的終端機上方有每台機器的分頁，切換分頁不會中斷其他台的連線；每次連線的紀錄會標示節點。
+
+注意：多節點題的記憶體是每台加總（範例 k8s 題一組約 5.5GB），比較適合面試或小班；
+LXC 節點不能載入核心模組（bonding、wireguard 等），STP、LACP 的封包也無法經過 PVE 的 bridge。
 
 ## 多國語言
 

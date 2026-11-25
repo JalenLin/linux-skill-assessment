@@ -20,6 +20,8 @@ questions/*
 !questions/README.md
 !questions/README.en.md
 !questions/example-hello/
+!questions/example-k8s/
+!questions/example-net/
 
 # 編輯器
 .vscode/

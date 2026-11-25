@@ -19,6 +19,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 EXAMPLE = ROOT / "questions" / "example-hello"
+EXAMPLE_K8S = ROOT / "questions" / "example-k8s"       # 多節點範例題（VM）
+EXAMPLE_NET = ROOT / "questions" / "example-net"       # 多節點範例題（LXC）
 ADMIN_PASSWORD = "test-admin-pw"
 
 
@@ -70,6 +72,8 @@ def server(tmp_path_factory):
     """啟動 mock 模式的網站，回傳 base URL"""
     base = tmp_path_factory.mktemp("lsa-server")
     cfg = make_config(base, copies=("hello-two",))
+    for ex in (EXAMPLE_K8S, EXAMPLE_NET):
+        shutil.copytree(ex, base / "questions" / ex.name)
     port = _free_port()
     env = dict(os.environ, LSA_CONFIG=str(cfg))
     log = open(base / "server.log", "w")

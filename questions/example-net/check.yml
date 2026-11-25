@@ -1,0 +1,42 @@
+# The grader node (role: grader in question.yaml) is powered on only while this check runs; participants have no
+# account on it and never see it. Testing from there checks the effect (what a client on the LAN gets), so
+# participants can't fake it by changing curl, sysctl or nft on their own machines.
+- name: Persistence — reboot r1 first, the fix has to survive it
+  hosts: r1
+  gather_facts: false
+  ignore_errors: true
+  tasks:
+    - name: "check:forward reboot r1"
+      ansible.builtin.shell: sleep 1 && systemctl reboot
+      async: 1
+      poll: 0
+    - name: "check:forward wait for r1 to come back"
+      ansible.builtin.wait_for_connection:
+        delay: 5
+        timeout: 120
+
+- name: Tests from a LAN client
+  hosts: grader
+  gather_facts: false
+  ignore_errors: true
+  tasks:
+    - name: "check:forward the LAN reaches the DMZ through r1"
+      ansible.builtin.command: ping -c 2 -W 2 172.16.0.10
+      register: ping
+      until: ping.rc == 0
+      retries: 5
+      delay: 3
+      changed_when: false
+
+    - name: "check:web the page opens from the LAN"
+      ansible.builtin.command: curl -s -m 5 http://172.16.0.10/
+      register: page
+      failed_when: "'Hello DMZ' not in page.stdout"
+      changed_when: false
+
+    # "keep the firewall on": a rule that accepts everything would pass a policy-drop check, so test the effect
+    - name: "check:web other ports on web are still blocked from the LAN (ssh)"
+      ansible.builtin.shell: timeout 3 bash -c '</dev/tcp/172.16.0.10/22'
+      register: ssh
+      failed_when: ssh.rc == 0
+      changed_when: false

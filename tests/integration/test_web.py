@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import csv
 import io
+from pathlib import Path
 import re
 import time
 
@@ -16,6 +17,8 @@ from helpers import Admin, Participant, flash, t
 
 Q = "example-hello"
 Q2 = "hello-two"
+QK = "example-k8s"          # 多節點範例題
+QN = "example-net"
 CJK = re.compile(r"[一-鿿]")
 
 
@@ -28,7 +31,7 @@ def visible_text(html: str) -> str:
 @pytest.fixture(scope="module")
 def admin(server):
     a = Admin(server, ADMIN_PASSWORD)
-    for qid in (Q, Q2):
+    for qid in (Q, Q2, QK, QN):
         j = a.build(qid, timeout=60)
         assert j["template"]["status"] == "ready" and j["selftest"]["ok"], j
     return a
@@ -71,11 +74,11 @@ def test_overview_getting_started_before_any_set(admin):
     """還沒有題組時，成績總覽顯示「開始使用」步驟（不跳到題組頁）。必須在其他測試建立題組之前執行。"""
     r = admin.get("/admin", allow_redirects=False)
     assert r.status_code == 200
-    assert "開始使用" in r.text and "已建置 2 / 2 題" in r.text and 'href="/admin/sets"' in r.text
+    assert "開始使用" in r.text and "已建置 4 / 4 題" in r.text and 'href="/admin/sets"' in r.text
     admin.s.cookies.set("lang", "en")
     try:
         r = admin.get("/admin")
-        assert "Getting started" in r.text and "(2 / 2 questions built)" in r.text
+        assert "Getting started" in r.text and "(4 / 4 questions built)" in r.text
         assert not CJK.findall(visible_text(r.text))
     finally:
         admin.s.cookies.set("lang", "zh-TW")
@@ -502,3 +505,117 @@ def test_partial_selftest_shown(admin, tmp_path_factory):
         con.execute("UPDATE templates SET selftest_json=? WHERE qid=?", (old, Q2))
         con.commit()
         con.close()
+
+
+def test_multi_node_group_flow(admin, person):
+    """多節點題（mock）：建置、整組開啟、每台一個終端機分頁、檢查、重置"""
+    qk = QK
+    sid = admin.create_set("Group set", "practice")
+    admin.add_question(sid, qk)
+    p = person()
+    assert p.api(sid, qk, "start")["ok"]
+    page = p.get(f"/s/{sid}/q/{qk}").text
+    assert '"name": "cp1"' in page and '"name": "w2"' in page          # 分頁
+
+    rows = admin.get("/admin/instances").text
+    assert all(n in rows for n in ("cp1", "w1", "w2"))
+
+    for bad in ("nope", None):                                        # 不存在的節點、沒指定節點
+        t = p.terminal(sid, qk, node=bad)
+        assert "這台機器不提供終端機" in t.read(until="終端機")
+        t.close()
+    w1 = p.terminal(sid, qk, node="w1")
+    assert "MOCK" in w1.read(until="$ ")
+    cp1 = p.terminal(sid, qk, node="cp1")                             # 兩台同時連著
+    assert "MOCK" in cp1.read(until="$ ")
+    assert p.check(sid, qk)["score"] == 0
+    cp1.send("mock-pass\r")
+    cp1.read(until="$ ")
+    assert p.check(sid, qk)["score"] == 10
+    w1.close()
+    cp1.close()
+
+    aid = admin.account_id(p.username)
+    html = admin.get(f"/admin/participant/{aid}").text
+    assert ">w1<" in html and ">cp1<" in html                         # 紀錄依節點標示
+
+    assert p.api(sid, qk, "reset")["ok"]
+    assert "cp1" not in admin.get("/admin/instances").text
+    assert p.api(sid, qk, "start")["ok"]
+    assert admin.get("/admin/instances").text.count("cp1") == 1
+    admin.delete_set(sid, "Group set")
+
+
+def test_multi_node_grader_and_admin_actions(admin, person):
+    """example-net（mock）：grader 沒有分頁、按檢查會開關 grader；後台對整組的操作；預先建立以機器數計"""
+    sid = admin.create_set("Net set", "practice")
+    admin.add_question(sid, QN)
+    p = person()
+    assert p.api(sid, QN, "start")["ok"]
+    page = p.get(f"/s/{sid}/q/{QN}").text
+    assert '"name": "pc1"' in page and '"name": "grader"' not in page   # grader 沒有分頁
+    t = p.terminal(sid, QN, node="grader")
+    assert "這台機器不提供終端機" in t.read(until="終端機")
+    t.close()
+    t = p.terminal(sid, QN, node="pc1")
+    t.read(until="$ ")
+    assert p.check(sid, QN)["score"] == 0                                # 檢查流程（含開關 grader）沒出錯
+    t.send("mock-pass\r")
+    t.read(until="$ ")
+    t.close()
+    assert p.check(sid, QN)["score"] == 10
+
+    row = next(r for r in re.findall(r"<tr>(.*?)</tr>", admin.get("/admin/instances").text, re.S) if "Net set" in r)
+    assert all(f">{n}<" in row for n in ("pc1", "r1", "web", "grader"))
+    iid = re.search(r'/admin/instances/(\d+)/stop"', row).group(1)
+    for action in ("stop", "start"):                                      # 後台停止／啟動整組
+        r = admin.post(f"/admin/instances/{iid}/{action}")
+        assert r.status_code == 303 and "完成" in flash(r), flash(r)
+    assert f'/admin/instances/{iid}/stop"' in admin.get("/admin/instances").text
+    r = admin.post(f"/admin/instances/{iid}/destroy")
+    assert "完成" in flash(r) and f"/admin/instances/{iid}/" not in admin.get("/admin/instances").text
+
+    # 預先建立以機器數計：同樣的帳號，多節點題（4 台）要算單機題的 4 倍；超過上限會被擋
+    settings = {"site_title": "Linux 實作能力檢驗系統", "notice": "", "max_running": "1", "idle_stop_min": "30",
+                "code_pattern": "^[A-Za-z0-9]{4,20}$", "default_lang": "zh-TW"}
+    single = admin.create_set("Single ref", "practice")
+    admin.add_question(single, Q)
+    admin.post("/admin/settings", data=dict(settings, max_instances="1"))
+
+    def wanted(set_id):
+        m = re.search(r"達到 (\d+).*目前 (\d+)", flash(admin.post(f"/admin/sets/{set_id}/prewarm", data={})))
+        assert m, "prewarm was not blocked by the limit"
+        return int(m.group(1)) - int(m.group(2))
+    k = wanted(single)
+    assert k > 0 and wanted(sid) == 4 * k
+    admin.post("/admin/settings", data=dict(settings, max_instances="1000"))
+    admin.post(f"/admin/sets/{single}/delete", data={"confirm": "Single ref"})
+    r = admin.post(f"/admin/sets/{sid}/prewarm", data={})
+    assert f"開始預先建立 {4 * k} 個實例" in flash(r), flash(r)
+    for _ in range(100):
+        if admin.get("/admin/instances").text.count(">grader<") >= k:
+            break
+        time.sleep(0.5)
+    else:
+        raise AssertionError("prewarm did not finish")
+    admin.delete_set(sid, "Net set")
+
+
+def test_multi_node_rebuild_and_delete(admin):
+    """多節點題重新建置會換掉每個節點的範本；刪除題目會刪掉全部節點範本"""
+    import zipfile
+    buf = io.BytesIO()
+    src = Path(__file__).resolve().parents[2] / "questions" / QN
+    with zipfile.ZipFile(buf, "w") as zf:
+        for f in src.rglob("*"):
+            if f.is_file():
+                zf.write(f, f"net-copy/{f.relative_to(src)}")
+    r = admin.post("/admin/questions/upload", files={"file": ("net-copy.zip", buf.getvalue(), "application/zip")})
+    assert "上傳失敗" not in flash(r), flash(r)
+    j1 = admin.build("net-copy", timeout=60)
+    j2 = admin.build("net-copy", timeout=60)                             # 重建
+    assert j1["selftest"]["ok"] and j2["selftest"]["ok"]
+    assert j2["template"]["vmid"] != j1["template"]["vmid"]
+    r = admin.post("/admin/questions/net-copy/delete")
+    assert "已刪除" in flash(r), flash(r)
+    assert admin.get("/admin/questions/net-copy/status.json").json()["template"] is None

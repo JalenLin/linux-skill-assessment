@@ -11,7 +11,7 @@
   <div class="rec-wrap">
     <div id="player" class="rec-player"></div>
     <ol class="rec-lines" id="rec-lines">
-      {% for l in lines %}<li class="{{ l.kind }}" data-i="{{ loop.index0 }}"><span class="muted">{{ l.at }}</span> {% if l.kind == 'blocked' %}⚠ {{ _("貼上被擋") }}{{ _("：") }}{{ l.text[15:] }}{% elif l.text == 'CONSOLE: requested' %}ℹ {{ _("作答者改用主控台") }}{% elif l.text.startswith('CONSOLE') %}ℹ {{ _("SSH 連不上，改用主控台") }}{% else %}<code>{{ l.text }}</code>{% endif %}</li>
+      {% for l in lines %}<li class="{{ l.kind }}" data-i="{{ loop.index0 }}"><span class="muted">{{ l.at }}</span> {% if l.kind == 'blocked' %}⚠ {{ _("貼上被擋") }}{{ _("：") }}{{ l.text[15:] }}{% elif l.text == 'CONSOLE: requested' %}ℹ {{ _("作答者改用主控台") }}{% elif l.text.startswith('CONSOLE') %}ℹ {{ _("SSH 連不上，改用主控台") }}{% elif l.text.startswith('NODE: ') %}ℹ {{ _("節點") }} <b>{{ l.text[6:] }}</b>{% else %}<code>{{ l.text }}</code>{% endif %}</li>
       {% else %}<li class="muted">{{ _("沒有輸入") }}</li>{% endfor %}
     </ol>
   </div>

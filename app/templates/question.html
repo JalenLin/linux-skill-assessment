@@ -42,9 +42,10 @@
   <section class="lsa-term">
     <div class="bar"><span class="dot" id="dot"></span><span id="term-status">{{ _("準備環境中…") }}</span>
       <span class="spacer"></span>
-      <button class="bar-btn" id="btn-console"{% if not q.terminal_switchable %} hidden{% endif %} title="{{ _("不經過網路連到你的環境（改壞了網路、防火牆或 sshd 時用）") }}">{{ _("改用主控台") }}</button>
+      <button class="bar-btn" id="btn-console" hidden title="{{ _("不經過網路連到你的環境（改壞了網路、防火牆或 sshd 時用）") }}">{{ _("改用主控台") }}</button>
       <button class="bar-btn" id="btn-popout" title="{{ _("把終端機移到新視窗（可放到另一個螢幕）") }}">{{ _("在新視窗開啟") }}</button>
     </div>
+    <div class="term-tabs" id="term-tabs" hidden></div>
     <div id="term"></div>
     <div id="start-panel" class="popped" hidden>
       <p id="start-info"></p>
@@ -62,7 +63,7 @@
 {% block scripts %}
 <script src="/static/vendor/xterm.js"></script>
 <script src="/static/vendor/addon-fit.js"></script>
-<script>window.QID = {{ q.qid | tojson }}; window.SID = {{ s.id }}; window.TIMING = {{ timing | tojson }}; window.BLOCK_PASTE = {{ s.block_paste | tojson }}; window.TERM_DEFAULT = {{ q.terminal_default | tojson }}; window.TERM_SWITCH = {{ q.terminal_switchable | tojson }};</script>
+<script>window.QID = {{ q.qid | tojson }}; window.SID = {{ s.id }}; window.TIMING = {{ timing | tojson }}; window.BLOCK_PASTE = {{ s.block_paste | tojson }}; window.TERM_TABS = {{ q.terminal_tabs() | tojson }};</script>
 <script src="/static/app.js"></script>
 <script src="/static/question.js"></script>
 {% endblock %}
