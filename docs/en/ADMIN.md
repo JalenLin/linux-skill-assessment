@@ -171,6 +171,9 @@ The attendance column in the Score overview shows the number of IPs; one person 
 
 The "Instances" page lists all participant environments; you can stop, start, or delete them individually, or stop all of them.
 
+- A multi-node question is one row per group; the VMID / IP columns list every machine with its node name. Stop, start
+  and delete act on the whole group (grader nodes only run during checks, so they are normally off)
+
 - When a participant is idle (not connected to a terminal) for longer than the configured time, the environment is paused automatically, with its contents kept
 - After a question set ends, its environments stop automatically
 - Pausing is always a **clean shutdown** (not a power cut), so participants' files are not lost
@@ -193,12 +196,14 @@ The "Instances" page lists all participant environments; you can stop, start, or
 3. Question set page: question list, score for each question, time remaining
 4. Question page: question description on the left, terminal on the right; buttons "Check answer", "Reset environment", "Reconnect"; the terminal can be popped out into a separate window
 5. The first time a question is opened, its environment is created (LXC about 10–30 seconds, VM about 1 minute); after that it only needs to be started
+6. Multi-node questions: the terminal has one tab per machine; switching tabs keeps the other connections open, and the admin recordings show which machine each session was on
 
 The account inside the participant environment is `user` (with sudo), and there is no network access.
 
 ## Using it for technical interviews
 
-The same workflow can also be used to give job candidates hands-on troubleshooting tasks (the interface uses the neutral terms "participant / ID", and the word "student" never appears):
+The same workflow can also be used to give job candidates hands-on troubleshooting tasks (the interface uses the neutral terms "participant / ID", and the word "student" never appears).
+Cluster tasks (e.g. k8s) can be multi-node questions; see the example `example-k8s` (3 VMs, about 5.5GB of memory per group):
 
 1. **Create accounts and bind them directly**: "Account" → "Import CSV", for example
    ```

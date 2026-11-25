@@ -30,10 +30,10 @@ after making changes, deploy to the test machine with `./deploy/deploy.sh`.
 | `app/db.py` | SQLite schema, automatic upgrades (migrations), System settings defaults |
 | `app/sets.py` | Question sets: open status, pausing practice during an assessment, points, attendance calculation |
 | `app/questions.py` | Question package loading and validation, zip upload, question translations |
-| `app/build.py` | Building question templates and self-tests (can also run from the command line: `python -m app.build <qid>`) |
-| `app/instances.py` | Participant environment lifecycle: create (linked clone), start, suspend, reset, concurrent running limit |
+| `app/build.py` | Building question templates and self-tests (can also run from the command line: `python -m app.build <qid>`); multi-node questions get one template per node |
+| `app/instances.py` | Participant environment lifecycle: create (linked clone), start, suspend, reset, concurrent running limit; multi-node groups as a unit, VLAN allocation, grader on/off |
 | `app/pve.py` | PVE API wrapper (proxmoxer); `MockPVE` for mock mode |
-| `app/grader.py` | Check queueing and execution (ansible-runner), scoring policies, score calculation |
+| `app/grader.py` | Check queueing and execution (ansible-runner), scoring policies, score calculation; multi-host inventory for multi-node questions |
 | `app/attempts.py` | Per-question time limits and attempt counts |
 | `app/shell.py` | Terminal: WebSocket ↔ SSH (asyncssh), console fallback when SSH is down; paste blocking |
 | `app/console.py` | PVE console (termproxy / vncwebsocket) client |
@@ -53,6 +53,13 @@ after making changes, deploy to the test machine with `./deploy/deploy.sh`.
   If SSH is still unreachable after a 10 / 30 second wait, it falls back to the PVE console: the API token calls `termproxy`, then connects to `vncwebsocket` (the token needs VM.Console, which `PVEVMAdmin` includes)
 - **Check**: `POST .../check` → `grader.enqueue` queues it (`grader_concurrency` at a time) → ansible-runner runs
   `check.yml` → pass/fail per item is tallied from task names `check:<id>` → stored in `check_runs`
+- **Multi-node questions**: every operation goes through `instances.nodes_of(inst)` (a single-machine question returns one
+  node with an empty name). Creating a group allocates one VMID per node and one VLAN per question network
+  (`vlan_min`–`vlan_max`, stored in `instances.vlans`); eth1… get their tags via `pve.set_nics`. The terminal websocket
+  carries `node=<name>`, and `main._shell_target` uses that node's `terminal` to decide whether and how to connect.
+  A check calls `instances.start_graders` first and `stop_graders` afterwards; `grader.inventory_for` builds the
+  inventory (host names = node names). Builds and self-tests use the fixed VLANs `build_vlan`–`build_vlan+3`
+  (one question is built at a time)
 - **Scores**: computed from `check_runs` according to the question set's scoring policy (if points change, scores are recalculated with the new points)
 
 ### Database
@@ -67,7 +74,8 @@ When changing the schema:
 
 Main tables: `accounts` (`participant_code` = participant ID), `qsets` (question sets; `mode` is `assessment` / `practice`),
 `set_questions` (a question set's questions and points), `templates`, `instances`, `check_runs`, `attempts` (timed attempts),
-`activity` (basis for attendance), `settings`.
+`activity` (basis for attendance), `settings`. Multi-node questions also use `instance_nodes` (every machine of a group;
+`instances.vmid/kind/ip` is the first one) and `template_nodes` (one template per node; `templates.vmid` is the first one).
 
 ## Multiple languages
 

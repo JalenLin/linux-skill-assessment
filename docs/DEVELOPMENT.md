@@ -30,10 +30,10 @@ LSA_CONFIG=config.dev.yaml .venv/bin/uvicorn app.main:app --reload --port 8000
 | `app/db.py` | SQLite 結構、自動升級（migration）、系統設定預設值 |
 | `app/sets.py` | 題組：開放狀態、測驗時練習暫停、配分、出席計算 |
 | `app/questions.py` | 題目包載入與驗證、zip 上傳、題目翻譯 |
-| `app/build.py` | 建置題目範本、自我測試（也可從指令列執行 `python -m app.build <qid>`） |
-| `app/instances.py` | 作答者環境生命週期：建立（linked clone）、啟動、暫停、重置、同時運作上限 |
+| `app/build.py` | 建置題目範本、自我測試（也可從指令列執行 `python -m app.build <qid>`）；多節點題每個節點各建一個範本 |
+| `app/instances.py` | 作答者環境生命週期：建立（linked clone）、啟動、暫停、重置、同時運作上限；多節點題以整組為單位、配置 VLAN、grader 開關 |
 | `app/pve.py` | PVE API 包裝（proxmoxer）；`MockPVE` 給 mock 模式 |
-| `app/grader.py` | 檢查排隊與執行（ansible-runner）、計分政策、成績計算 |
+| `app/grader.py` | 檢查排隊與執行（ansible-runner）、計分政策、成績計算；多節點題的多台 inventory |
 | `app/attempts.py` | 單題限時與次數 |
 | `app/shell.py` | 終端機：WebSocket ↔ SSH（asyncssh），SSH 不通時改用主控台；禁止貼上 |
 | `app/console.py` | PVE 主控台（termproxy／vncwebsocket）用戶端 |
@@ -53,6 +53,11 @@ LSA_CONFIG=config.dev.yaml .venv/bin/uvicorn app.main:app --reload --port 8000
   SSH 連不上（等 10／30 秒後仍不通）就改走 PVE 主控台：API token 呼叫 `termproxy`，再連 `vncwebsocket`（token 需要 VM.Console，`PVEVMAdmin` 已包含）
 - **檢查**：`POST .../check` → `grader.enqueue` 排隊（同時 `grader_concurrency` 個）→ ansible-runner 跑
   `check.yml` → 依 task 名稱 `check:<id>` 統計各項通過與否 → 存入 `check_runs`
+- **多節點題**：所有操作都經過 `instances.nodes_of(inst)`（單機題回傳一台、名稱是空字串）。
+  建立時每台一個 VMID、每個題目網路一個 VLAN（`vlan_min`～`vlan_max`，存在 `instances.vlans`），eth1… 用 `pve.set_nics` 設定 tag。
+  終端機 websocket 帶 `node=<名稱>`，`main._shell_target` 依節點的 `terminal` 決定能不能連、用哪種方式。
+  檢查時 `instances.start_graders` 先開 grader 節點，跑完 `stop_graders`；inventory 由 `grader.inventory_for` 產生（host 名稱 = 節點名稱）。
+  建置與自我測試用固定的 VLAN `build_vlan`～`build_vlan+3`（一次只建一題）
 - **成績**：依題組計分政策從 `check_runs` 計算（配分改了會依新配分重算）
 
 ### 資料庫
@@ -67,7 +72,8 @@ SQLite（`data_dir/lsa.db`），結構在 `app/db.py` 的 `SCHEMA`，版本記�
 
 主要資料表：`accounts`（`participant_code` = 編號）、`qsets`（題組，`mode` 為 `assessment` / `practice`）、
 `set_questions`（題組的題目與配分）、`templates`、`instances`、`check_runs`、`attempts`（限時作答）、
-`activity`（出席依據）、`settings`。
+`activity`（出席依據）、`settings`。多節點題另有 `instance_nodes`（每組的每台機器；`instances.vmid/kind/ip` 是第一台）、
+`template_nodes`（每個節點的範本；`templates.vmid` 是第一台）。
 
 ## 多國語言
 

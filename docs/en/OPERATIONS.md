@@ -45,6 +45,11 @@ Test environment: Intel N305 (8 E-cores), 48GB RAM, NVMe, PVE 9, local-lvm.
 | 60 | 7GB | 31GB |
 | 100 | 9GB | 49GB |
 
+**Multi-node questions**: add up the memory of all machines; each participant uses a whole group (grader nodes only run
+during checks and don't count). For example `example-net` (3 LXC) needs about 0.3GB per group, about 18GB for 60 people at
+once; `example-k8s` (3 VMs) needs about 5.5GB per group, so a 48GB host runs only 6–7 groups at once — suited to interviews
+and small classes. For storage, a group uses one LV per machine (grader included).
+
 **CPU**: light during answering and checking; many VMs booting at once causes a backlog (about 3 minutes for 60 on an N305).
 In a real assessment, participants will not all open the same question in the same minute, so the load is lighter than in the test. Before the assessment, remind participants that "the first time you open a VM question, it takes 1–2 minutes".
 
@@ -124,6 +129,14 @@ free -m; uptime                                        # memory, load
 - The participant broke root's SSH or the network, or the environment cannot boot (e.g. a broken fstab prevents booting)
 - The system has already retried once automatically; the participant should reset the question and redo it
 
+**Multi-node questions: one machine is unreachable, or the machines of a group can't reach each other**
+
+- One machine's tab can't connect: it falls back to the console just like single-machine questions; resetting rebuilds the whole group
+- A check shows "The grader cannot log in to some machines": those machines' items score 0, the others are graded normally
+- No machine in a group can reach another: check that vmbr1 on PVE is VLAN-aware (`cat /sys/class/net/vmbr1/bridge/vlan_filtering`
+  prints 1), otherwise run `./pve-setup.sh network` again on PVE; `bridge vlan show` lists each machine's eth1… VLAN (eth0 should only have VLAN 1)
+- Grader nodes are normally powered off; that is expected. If one fails to start during a check, the check log shows it as unreachable
+
 **Building a template fails**
 
 - Question bank → question page: check the build log; it is usually an Ansible error in setup.yml
@@ -152,3 +165,6 @@ free -m; uptime                                        # memory, load
 - After a template is rebuilt, the old template is kept if participant instances still use it; when those instances are later deleted, the old template is not deleted automatically.
   Delete it manually in PVE when needed (`tmpl-<question id>`, VMID 9100 or above, the one not shown on the admin Question bank page)
 - When the service restarts, checks in progress are interrupted (the participant just presses it again); do not update the application during an assessment
+- Multi-node questions: PVE rewrites the eth1… settings of LXC nodes at every start (use VM nodes for questions where
+  participants change IPs); STP and LACP frames don't pass PVE's bridge; at most 8 nodes and 4 question networks per group;
+  old templates of multi-node questions are named after the node (e.g. `cp1`), without the `tmpl-` prefix

@@ -162,6 +162,10 @@ git pull
 
 - When the database schema changes, it is upgraded automatically on startup — no manual steps needed; to be safe, back up first (next section)
 - When the service restarts, open terminals disconnect and reconnect automatically; **do not update while an assessment is in progress**
+- **Upgrading from a version without multi-node questions** (installed before 2026-11): to use multi-node questions, run
+  `./pve-setup.sh network` once more on the PVE host. It makes vmbr1 VLAN-aware (the original file is backed up as
+  `/etc/network/interfaces.bak.*`) and updates the hookscript; existing single-machine questions are not affected and
+  running environments don't need to stop. Without it, the machines of a multi-node group cannot reach each other
 
 ## 9. Backup and restore
 
